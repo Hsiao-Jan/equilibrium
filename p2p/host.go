@@ -19,18 +19,20 @@ var (
 	errNoPrivateKey = errors.New("Host.PrivateKey must be set to a non-nil key")
 )
 
-type host struct {
+// Host represents a p2p host.
+type Host struct {
 	Config
 	libp2p_host.Host
 	*pubsub.PubSub
 }
 
-// NewHost returns a new p2p host
-func NewHost(cfg Config) *host {
-	return &host{Config: cfg}
+// NewHost returns a new p2p host.
+func NewHost(cfg Config) *Host {
+	return &Host{Config: cfg}
 }
 
-func (h *host) Start() error {
+// Start initiates the host operations.
+func (h *Host) Start() error {
 	if h.PrivateKey == nil {
 		return errNoPrivateKey
 	}
@@ -76,6 +78,7 @@ func (h *host) Start() error {
 	return nil
 }
 
-func (h *host) Stop() error {
+// Stop terminates the host operations.
+func (h *Host) Stop() error {
 	return h.Host.Close()
 }

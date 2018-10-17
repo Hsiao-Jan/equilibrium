@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -62,11 +61,11 @@ to quickly create a Cobra application.`
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "kcoin",
+	Use:   "eqb",
 	Short: "A brief description of your application",
 	Long:  rootCmdLongDesc,
 	Args:  cobra.NoArgs,
-	RunE:  runKcoin,
+	RunE:  runEQB,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -81,13 +80,13 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kcoin.yaml)")
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.eqb.yaml)")
 	rootCmd.Flags().BoolVar(&isBootstrappingNode, "bootnode", false, "node provides initial configuration information to newly joining nodes so that they may successfully join the overlay network")
 	rootCmd.Flags().StringVar(&verbosity, "verbosity", "info", "sets the logger verbosity level ('debug', 'info', 'warn' ,'error', 'dpanic', 'panic', 'fatal'")
 	rootCmd.Flags().StringVar(&dataDir, "datadir", "", "data directory for the databases and keystore")
 	rootCmd.Flags().StringVar(&nodeKey, "identity", "", "path of the p2p host key file")
 	rootCmd.Flags().IntVarP(&listenPort, "port", "p", 32000, "port for incoming connections")
-	rootCmd.Flags().IntVar(&listenIP, "ip", "", "ip used for incoming connections")
+	rootCmd.Flags().StringVar(&listenIP, "ip", "", "ip used for incoming connections")
 
 }
 
@@ -104,9 +103,9 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".kcoin" (without extension).
+		// Search config in home directory with name ".eqb" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigName(".kcoin")
+		viper.SetConfigName(".eqb")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -117,12 +116,12 @@ func initConfig() {
 	}
 }
 
-type KcoinConfig struct {
+type eqbConfig struct {
 	Node   node.Config
 	logger *zap.Logger
 }
 
-func runKcoin(cmd *cobra.Command, args []string) error {
+func runEQB(cmd *cobra.Command, args []string) error {
 
 	node := makeNode()
 
@@ -130,7 +129,7 @@ func runKcoin(cmd *cobra.Command, args []string) error {
 }
 
 func makeNode() *node.Node {
-	cfg := KcoinConfig{
+	cfg := eqbConfig{
 		Node: node.DefaultConfig,
 	}
 

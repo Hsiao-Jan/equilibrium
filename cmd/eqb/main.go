@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/kowala-tech/equilibrium/cmd/kcoin/cmd"
+import "github.com/kowala-tech/equilibrium/cmd/eqb/cmd"
 
 func main() {
 	cmd.Execute()
