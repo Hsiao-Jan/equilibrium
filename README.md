@@ -1,1 +1,1 @@
-# Kowala experimental client
+# Equilibrium
