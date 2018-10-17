@@ -1,4 +1,4 @@
-// Copyright © 2018 NAME HERE <EMAIL ADDRESS>
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/kowala-tech/client-experimental/cmd/kcoin/cmd"
+import "github.com/kowala-tech/equilibrium/cmd/kcoin/cmd"
 
 func main() {
 	cmd.Execute()

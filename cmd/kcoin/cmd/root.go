@@ -1,4 +1,4 @@
-// Copyright © 2018 NAME HERE <EMAIL ADDRESS>
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,39 +18,55 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/kowala-tech/kcoin/client/log"
-	"github.com/kowala-tech/p2p-poc/core"
-	"github.com/kowala-tech/p2p-poc/node"
-	"github.com/kowala-tech/p2p-poc/params"
+	"github.com/kowala-tech/equilibrium/node"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
-	cfgFile         string
-	dataDir         string
-	verbosity       int
-	isBootstrapNode bool
-	bootstrapNodes  = make([]string, 0)
+	// cfgFile represents the config file path.
+	cfgFile string
+
+	// verbosity sets the verbosity level.
+	verbosity string
+
+	// isBootstrappingNode node performs bootstrapping operations.
+	isBootstrappingNode bool
+
+	// dataDir is the data directory for the databases and keystore.
+	dataDir string
+
+	// nodePrivKeyFile is the p2p host key file.
+	nodeKey string
+
+	// bootstrappingNodes contains the initial list of bootstrapping nodes.
+	bootstrappingNodes = make([]string, 0)
+
+	// listenPort represents the port used for incoming connections
+	listenPort int 
+
+	// listenIP represents the ip used for incoming connections.
+	listenIP string 
 )
+
+const rootCmdLongDesc = `A longer description that spans multiple lines and likely contains
+examples and usage of using your application. For example:
+
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "kcoin",
 	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	RunE: runKcoin,
+	Long:  rootCmdLongDesc,
+	Args:  cobra.NoArgs,
+	RunE:  runKcoin,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -65,15 +81,14 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kcoin.yaml)")
+	rootCmd.Flags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.kcoin.yaml)")
+	rootCmd.Flags().BoolVar(&isBootstrappingNode, "bootnode", false, "node provides initial configuration information to newly joining nodes so that they may successfully join the overlay network")
+	rootCmd.Flags().StringVar(&verbosity, "verbosity", "info", "sets the logger verbosity level ('debug', 'info', 'warn' ,'error', 'dpanic', 'panic', 'fatal'")
+	rootCmd.Flags().StringVar(&dataDir, "datadir", "", "data directory for the databases and keystore")
+	rootCmd.Flags().StringVar(&nodeKey, "identity", "", "path of the p2p host key file")
+	rootCmd.Flags().IntVarP(&listenPort, "port", "p", 32000, "port for incoming connections")
+	rootCmd.Flags().IntVar(&listenIP, "ip", "", "ip used for incoming connections")
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rootCmd.Flags().BoolP("oracle", "oracle", false, "Enables the oracle service")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -102,15 +117,41 @@ func initConfig() {
 	}
 }
 
-type GlobalConfig struct {
-	Node node.Config
+type KcoinConfig struct {
+	Node   node.Config
+	logger *zap.Logger
 }
 
 func runKcoin(cmd *cobra.Command, args []string) error {
 
+	node := makeNode()
+
 	return nil
 }
 
+func makeNode() *node.Node {
+	cfg := KcoinConfig{
+		Node: node.DefaultConfig,
+	}
+
+	setNodeConfig(&cfg.Node)
+
+	node := node.New(context.Background(), cfg.Node)
+
+	return node, cfg
+}
+
+func setNodeConfig(cfg *node.Config) {
+	cfg.P2P.isBootstrappingNode = isBootstrappingNode
+	cfg.P2P.ListenAddr = fmt.Sprintf("/ip4/%v/tcp/%v", listenIP, listenPort)
+	cfg.P2P.BootstrappingNodes = bootstrappingNodes
+}
+
+func startNode(stack *node.Node) {
+	
+}
+
+/*
 func RegisterKowalaOracleService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var kowalaServ *knode.Kowala
@@ -121,20 +162,7 @@ func RegisterKowalaOracleService(stack *node.Node) {
 	}
 }
 
-func makeConfigNode() (*node.Node, GlobalConfig) {
-	cfg := GlobalConfig{
-		Node: node.DefaultConfig,
-		Core: core.DefaultConfig,
-	}
 
-	setNodeConfig(&cfg.Node)
-
-	node := node.New(context.Background(), cfg.Node)
-
-
-
-	return node, cfg
-}
 
 
 // startNode boots up the system node and all registered protocols, after which
@@ -163,13 +191,4 @@ func startNode(stack *node.Node) {
 	}()
 }
 
-func setNodeConfig(cfg *node.Config) {
-	if isBootnode {
-		cfg.P2P.IsBootnode = true
-	}
 
-	cfg.P2P.ListenAddr = listenAddr
-	cfg.P2P.BootstrapNodes = params.NetworkBootnodes
-	cfg.P2P.IDGenerationSeed = seed
-	cfg.P2P.BootstrapNodes = bootnodes
-}
