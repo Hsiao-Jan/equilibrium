@@ -5,19 +5,18 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kowala-tech/kcoin/client/accounts"
-
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/contracts/bindings/oracle"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/contracts/bindings/oracle"
+	"github.com/kowala-tech/equilibrium/internal/kcoinapi"
+	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/oracle/scraper"
+	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/equilibrium/rpc"
+	"github.com/kowala-tech/equilibrium/types"
 	"github.com/kowala-tech/kcoin/client/core"
 	"github.com/kowala-tech/kcoin/client/core/rawdb"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/internal/kcoinapi"
 	"github.com/kowala-tech/kcoin/client/knode"
-	"github.com/kowala-tech/kcoin/client/log"
-	"github.com/kowala-tech/kcoin/client/oracle/scraper"
-	"github.com/kowala-tech/kcoin/client/p2p"
-	"github.com/kowala-tech/kcoin/client/rpc"
 	"github.com/pkg/errors"
 )
 

@@ -12,9 +12,9 @@ import (
 type Config struct {
 	PrivateKey *crypto.PrivKey
 
-	BootstrapNodes []pstore.PeerInfo
+	BootstrappingNodes []pstore.PeerInfo
 
-	IsBootstrapNode bool
+	IsBootstrappingNode bool
 
 	ListenAddr string
 

@@ -8,6 +8,7 @@ import (
 	ipfssync "github.com/ipfs/go-datastore/sync"
 	pubsub "github.com/libp2p/go-floodsub"
 	libp2p "github.com/libp2p/go-libp2p"
+	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	rhost "github.com/libp2p/go-libp2p/p2p/host/routed"
@@ -34,12 +35,15 @@ func (h *host) Start() error {
 		return errNoPrivateKey
 	}
 
+	connMgr := connmgr.NewConnManager(h.MinPeers, h.MaxPeers, h.PruningGracePeriod)
+
 	ctx := context.Background()
 	host, err := libp2p.New(
 		ctx,
 		libp2p.Identity(*h.PrivateKey),
 		libp2p.ListenAddrStrings(h.ListenAddr),
 		libp2p.NATPortMap(),
+		libp2p.ConnectionManager(connMgr),
 	)
 	if err != nil {
 		return err
@@ -54,14 +58,14 @@ func (h *host) Start() error {
 
 	dht := dht.NewDHT(ctx, host, ipfssync.MutexWrap(dstore.NewMapDatastore()))
 
-	if len(h.BootstrapNodes) > 0 {
+	if len(h.BootstrappingNodes) > 0 {
 		routedHost := rhost.Wrap(host, dht)
-		if err := bootstrapConnect(ctx, routedHost, h.BootstrapNodes); err != nil {
+		if err := bootstrapConnect(ctx, routedHost, h.BootstrappingNodes); err != nil {
 			zap.L().Error("Could not connect to the bootstrap nodes", zap.String("err", err.Error()))
 		}
 	}
 
-	if h.IsBootstrapNode {
+	if h.IsBootstrappingNode {
 		if err := dht.Bootstrap(ctx); err != nil {
 			return err
 		}

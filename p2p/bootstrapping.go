@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/kowala-tech/client-experimental/log"
+	"go.uber.org/zap"
+
+	"github.com/kowala-tech/equilibrium/log"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 )
@@ -16,7 +18,7 @@ func bootstrapConnect(ctx context.Context, ph libp2p_host.Host, peers []pstore.P
 		return errors.New("not enough bootstrap peers")
 	}
 
-	log.Logger.Info("Connecting to bootstrap nodes ...")
+	log.Info("Connecting to bootstrap nodes ...")
 
 	errs := make(chan error, len(peers))
 	var wg sync.WaitGroup
@@ -30,17 +32,17 @@ func bootstrapConnect(ctx context.Context, ph libp2p_host.Host, peers []pstore.P
 		wg.Add(1)
 		go func(p pstore.PeerInfo) {
 			defer wg.Done()
-			defer log.Logger.Debug("bootstrapDial", "from", ph.ID().Pretty(), "bootstrapping to", p.ID)
-			log.Logger("bootstrapDial", "from", ph.ID(), "bootstrapping to", p.ID)
+			defer log.Debug("bootstrapDial", zap.String("from", ph.ID().Pretty()), zap.String("bootstrapping to", p.ID.Pretty()))
+			log.Info("bootstrapDial", zap.String("from", ph.ID().Pretty()), zap.String("bootstrapping to", p.ID.Pretty()))
 
 			ph.Peerstore().AddAddrs(p.ID, p.Addrs, pstore.PermanentAddrTTL)
 			if err := ph.Connect(ctx, p); err != nil {
-				log.Error("Failed to bootstrap with", "ID", p.ID, "err", err)
+				log.Error("Failed to bootstrap with", zap.String("ID", p.ID.Pretty()), zap.Error(err))
 				errs <- err
 				return
 			}
-			log.Logger.Debug("bootstrapDialSuccess", "ID", p.ID)
-			log.Logger.Info("Bootstrapped with", "ID", p.ID)
+			log.Debug("bootstrapDialSuccess", zap.String("ID", p.ID.Pretty()))
+			log.Info("Bootstrapped with", zap.String("ID", p.ID.Pretty()))
 		}(p)
 	}
 	wg.Wait()
