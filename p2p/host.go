@@ -6,6 +6,7 @@ import (
 
 	dstore "github.com/ipfs/go-datastore"
 	ipfssync "github.com/ipfs/go-datastore/sync"
+	"github.com/kowala-tech/equilibrium/log"
 	pubsub "github.com/libp2p/go-floodsub"
 	libp2p "github.com/libp2p/go-libp2p"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
@@ -63,7 +64,7 @@ func (h *Host) Start() error {
 	if len(h.BootstrappingNodes) > 0 {
 		routedHost := rhost.Wrap(host, dht)
 		if err := bootstrapConnect(ctx, routedHost, h.BootstrappingNodes); err != nil {
-			zap.L().Error("Could not connect to the bootstrap nodes", zap.String("err", err.Error()))
+			log.Error("Could not connect to the bootstrap nodes", zap.Error(err))
 		}
 	}
 
@@ -73,7 +74,7 @@ func (h *Host) Start() error {
 		}
 	}
 
-	zap.L().Info("Listening...", zap.String("ID", host.ID().Pretty()), zap.String("ADDR", h.ListenAddr))
+	log.Info("Listening...", zap.String("ID", host.ID().Pretty()), zap.String("addr", h.ListenAddr))
 
 	return nil
 }

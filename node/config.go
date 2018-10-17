@@ -14,15 +14,34 @@
 
 package node
 
-import "github.com/kowala-tech/equilibrium/p2p"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/kowala-tech/equilibrium/p2p"
+)
 
 var DefaultConfig = Config{
 	P2P: p2p.DefaultConfig,
 }
 
-// Config represents
+// Config holds the node configurations.
 type Config struct {
+	Name string
+
 	DataDir string
 
 	P2P p2p.Config
+}
+
+func (c *Config) name() string {
+	if c.Name == "" {
+		progname := strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+		if progname == "" {
+			panic("empty executable name, set Config.Name")
+		}
+		return progname
+	}
+	return c.Name
 }

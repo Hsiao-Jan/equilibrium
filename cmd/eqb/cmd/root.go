@@ -17,9 +17,17 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/node"
+	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/equilibrium/params"
+	crypto "github.com/libp2p/go-libp2p-crypto"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,10 +54,12 @@ var (
 	bootstrappingNodes = make([]string, 0)
 
 	// listenPort represents the port used for incoming connections
-	listenPort int 
+	listenPort int
 
 	// listenIP represents the ip used for incoming connections.
-	listenIP string 
+	listenIP string
+
+	isDevNetwork, isTestNetwork bool
 )
 
 const rootCmdLongDesc = `A longer description that spans multiple lines and likely contains
@@ -87,6 +97,8 @@ func init() {
 	rootCmd.Flags().StringVar(&nodeKey, "identity", "", "path of the p2p host key file")
 	rootCmd.Flags().IntVarP(&listenPort, "port", "p", 32000, "port for incoming connections")
 	rootCmd.Flags().StringVar(&listenIP, "ip", "", "ip used for incoming connections")
+	rootCmd.Flags().BoolVar(&isDevNetwork, "dev", false, "pre-configured settings for the dev network")
+	rootCmd.Flags().BoolVar(&isDevNetwork, "test", false, "pre-configured settings for the test network")
 
 }
 
@@ -122,8 +134,9 @@ type eqbConfig struct {
 }
 
 func runEQB(cmd *cobra.Command, args []string) error {
-
 	node := makeNode()
+	startNode(node)
+	node.Wait()
 
 	return nil
 }
@@ -133,21 +146,79 @@ func makeNode() *node.Node {
 		Node: node.DefaultConfig,
 	}
 
-	setNodeConfig(&cfg.Node)
+	if err := setNodeConfig(&cfg.Node); err != nil {
+		log.Fatal("Failed to set the node config", zap.Error(err))
+	}
 
-	node := node.New(context.Background(), cfg.Node)
+	node, err := node.New(context.Background(), &cfg.Node)
+	if err != nil {
+		log.Fatal("Failed to create the node", zap.Error(err))
+	}
 
-	return node, cfg
+	return node
 }
 
-func setNodeConfig(cfg *node.Config) {
-	cfg.P2P.isBootstrappingNode = isBootstrappingNode
+func setNodeConfig(cfg *node.Config) error {
+	setBootstrappingNodes(&cfg.P2P)
+	cfg.P2P.IsBootstrappingNode = isBootstrappingNode
 	cfg.P2P.ListenAddr = fmt.Sprintf("/ip4/%v/tcp/%v", listenIP, listenPort)
-	cfg.P2P.BootstrappingNodes = bootstrappingNodes
+
+	if nodeKey == "" {
+		privKey, _, err := crypto.GenerateKeyPairWithReader(crypto.RSA, 2048, rand.New(rand.NewSource(0)))
+		if err != nil {
+			return err
+		}
+		cfg.P2P.PrivateKey = &privKey
+	}
+
+	return nil
+}
+
+// setBootstrappingNodes creates a list of bootstrap nodes from the command line
+// flags, reverting to pre-configured ones if none have been specified.
+func setBootstrappingNodes(cfg *p2p.Config) {
+	urls := params.MainBootstrappingNodes
+	switch {
+	case len(bootstrappingNodes) > 0:
+		urls = bootstrappingNodes
+	case isTestNetwork:
+		urls = params.TestBootstrappingNodes
+	case isDevNetwork:
+		urls = params.DevBootstrappingNodes
+	}
+
+	cfg.BootstrappingNodes = make([]pstore.PeerInfo, 0, len(urls))
+	for _, url := range urls {
+		peerInfo, err := p2p.ParseURL(url)
+		if err != nil {
+			log.Error("Invalid Bootstrap url", zap.String("url", url), zap.Error(err))
+			continue
+		}
+		cfg.BootstrappingNodes = append(cfg.BootstrappingNodes, *peerInfo)
+	}
 }
 
 func startNode(stack *node.Node) {
-	
+	log.Info("Starting Node")
+	if err := stack.Start(); err != nil {
+		log.Fatal("Error starting protocol stack", zap.Error(err))
+	}
+	go func() {
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(sigc)
+		<-sigc
+		log.Info("Got interrupt, shutting down...")
+		go stack.Stop()
+		for i := 10; i > 0; i-- {
+			<-sigc
+			if i > 1 {
+				log.Info("Already shutting down, interrupt more to panic.", zap.Int("times", i-1))
+			}
+		}
+		//debug.Exit() // ensure trace and CPU profile data is flushed.
+		//debug.LoudPanic("boom")
+	}()
 }
 
 /*
@@ -168,26 +239,6 @@ func RegisterKowalaOracleService(stack *node.Node) {
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
 // validator.
 func startNode(stack *node.Node) {
-	log.Info("Starting Node")
-	if err := stack.Start(); err != nil {
-		log.Crit("Error starting protocol stack", "err", err)
-	}
-	go func() {
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigc)
-		<-sigc
-		log.Info("Got interrupt, shutting down...")
-		go stack.Stop()
-		for i := 10; i > 0; i-- {
-			<-sigc
-			if i > 1 {
-				log.Warn("Already shutting down, interrupt more to panic.", "times", i-1)
-			}
-		}
-		//debug.Exit() // ensure trace and CPU profile data is flushed.
-		//debug.LoudPanic("boom")
-	}()
+
 }
-
-
+*/
