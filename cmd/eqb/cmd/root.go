@@ -26,6 +26,7 @@ import (
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/p2p"
 	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/services/archive"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
@@ -155,6 +156,9 @@ func makeNode() *node.Node {
 		log.Fatal("Failed to create the node", zap.Error(err))
 	}
 
+	//RegisterArchiveService(node)
+	//RegisterMiningService(node)
+
 	return node
 }
 
@@ -221,24 +225,22 @@ func startNode(stack *node.Node) {
 	}()
 }
 
-/*
-func RegisterKowalaOracleService(stack *node.Node) {
+func RegisterArchiveService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var kowalaServ *knode.Kowala
-		ctx.Service(&kowalaServ)
- 		return oracle.New(kowalaServ)
+		return archive.New(ctx)
 	}); err != nil {
-		Fatalf("Failed to register the Kowala Oracle service. %v", err)
+		log.Fatal("Failed to register the archive service", zap.Error(err))
 	}
 }
 
-
-
-
-// startNode boots up the system node and all registered protocols, after which
-// it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
-// validator.
-func startNode(stack *node.Node) {
-
+/*
+func RegisterMiningService(stack *node.Node) {
+	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var archiveService *archive.Service
+		ctx.Service(&archiveService)
+		return mining.New(archiveService)
+	}); err != nil {
+		log.Fatal("Failed to register the mining service", zap.Error(err))
+	}
 }
 */

@@ -18,8 +18,7 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -43,8 +42,8 @@ type headerMarshaling struct {
 	Number              *hexutil.Big
 	ComputationalEffort hexutil.Uint64
 	Time                *hexutil.Big
-	Extra               hexutil.Byte
-	Hash                common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	Extra               hexutil.Bytes
+	Hash                Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
 type Block struct {
