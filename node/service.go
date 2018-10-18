@@ -18,8 +18,8 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/p2p"
-	"github.com/kowala-tech/kcoin/client/event"
 )
 
 var (

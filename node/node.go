@@ -25,9 +25,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/p2p"
-	"github.com/kowala-tech/kcoin/client/event"
 	"github.com/prometheus/prometheus/util/flock"
 	"go.uber.org/zap"
 )
