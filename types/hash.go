@@ -23,7 +23,8 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
 )
 
 const HashLength = 32
@@ -47,7 +48,7 @@ func BigToHash(b *big.Int) Hash { return BytesToHash(b.Bytes()) }
 
 // HexToHash sets byte representation of s to hash.
 // If b is larger than len(h), b will be cropped from the left.
-func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
+func HexToHash(s string) Hash { return BytesToHash(common.FromHex(s)) }
 
 // Bytes gets the byte representation of the underlying hash.
 func (h Hash) Bytes() []byte { return h[:] }

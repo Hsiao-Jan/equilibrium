@@ -1,27 +1,24 @@
-// Copyright 2014 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package types
 
 import (
 	"io"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
 //go:generate gencodec -type Log -field-override logMarshaling -out gen_log_json.go
@@ -31,9 +28,9 @@ import (
 type Log struct {
 	// Consensus fields:
 	// address of the contract that generated the event
-	Address common.Address `json:"address" gencodec:"required"`
+	ContractAddress Address `json:"address" gencodec:"required"`
 	// list of topics provided by the contract.
-	Topics []common.Hash `json:"topics" gencodec:"required"`
+	Topics []Hash `json:"topics" gencodec:"required"`
 	// supplied by the contract, usually ABI-encoded
 	Data []byte `json:"data" gencodec:"required"`
 
@@ -42,11 +39,11 @@ type Log struct {
 	// block in which the transaction was included
 	BlockNumber uint64 `json:"blockNumber"`
 	// hash of the transaction
-	TxHash common.Hash `json:"transactionHash" gencodec:"required"`
+	TxHash Hash `json:"transactionHash" gencodec:"required"`
 	// index of the transaction in the block
 	TxIndex uint `json:"transactionIndex" gencodec:"required"`
 	// hash of the block in which the transaction was included
-	BlockHash common.Hash `json:"blockHash"`
+	BlockHash Hash `json:"blockHash"`
 	// index of the log in the receipt
 	Index uint `json:"logIndex" gencodec:"required"`
 
@@ -63,25 +60,25 @@ type logMarshaling struct {
 }
 
 type rlpLog struct {
-	Address common.Address
-	Topics  []common.Hash
-	Data    []byte
+	ContractAddress Address
+	Topics          []Hash
+	Data            []byte
 }
 
 type rlpStorageLog struct {
-	Address     common.Address
-	Topics      []common.Hash
-	Data        []byte
-	BlockNumber uint64
-	TxHash      common.Hash
-	TxIndex     uint
-	BlockHash   common.Hash
-	Index       uint
+	ContractAddress Address
+	Topics          []Hash
+	Data            []byte
+	BlockNumber     uint64
+	TxHash          Hash
+	TxIndex         uint
+	BlockHash       Hash
+	Index           uint
 }
 
 // EncodeRLP implements rlp.Encoder.
 func (l *Log) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, rlpLog{Address: l.Address, Topics: l.Topics, Data: l.Data})
+	return rlp.Encode(w, rlpLog{ContractAddress: l.ContractAddress, Topics: l.Topics, Data: l.Data})
 }
 
 // DecodeRLP implements rlp.Decoder.
@@ -89,7 +86,7 @@ func (l *Log) DecodeRLP(s *rlp.Stream) error {
 	var dec rlpLog
 	err := s.Decode(&dec)
 	if err == nil {
-		l.Address, l.Topics, l.Data = dec.Address, dec.Topics, dec.Data
+		l.ContractAddress, l.Topics, l.Data = dec.ContractAddress, dec.Topics, dec.Data
 	}
 	return err
 }
@@ -101,14 +98,14 @@ type LogForStorage Log
 // EncodeRLP implements rlp.Encoder.
 func (l *LogForStorage) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, rlpStorageLog{
-		Address:     l.Address,
-		Topics:      l.Topics,
-		Data:        l.Data,
-		BlockNumber: l.BlockNumber,
-		TxHash:      l.TxHash,
-		TxIndex:     l.TxIndex,
-		BlockHash:   l.BlockHash,
-		Index:       l.Index,
+		ContractAddress: l.ContractAddress,
+		Topics:          l.Topics,
+		Data:            l.Data,
+		BlockNumber:     l.BlockNumber,
+		TxHash:          l.TxHash,
+		TxIndex:         l.TxIndex,
+		BlockHash:       l.BlockHash,
+		Index:           l.Index,
 	})
 }
 
@@ -118,14 +115,14 @@ func (l *LogForStorage) DecodeRLP(s *rlp.Stream) error {
 	err := s.Decode(&dec)
 	if err == nil {
 		*l = LogForStorage{
-			Address:     dec.Address,
-			Topics:      dec.Topics,
-			Data:        dec.Data,
-			BlockNumber: dec.BlockNumber,
-			TxHash:      dec.TxHash,
-			TxIndex:     dec.TxIndex,
-			BlockHash:   dec.BlockHash,
-			Index:       dec.Index,
+			ContractAddress: dec.ContractAddress,
+			Topics:          dec.Topics,
+			Data:            dec.Data,
+			BlockNumber:     dec.BlockNumber,
+			TxHash:          dec.TxHash,
+			TxIndex:         dec.TxIndex,
+			BlockHash:       dec.BlockHash,
+			Index:           dec.Index,
 		}
 	}
 	return err

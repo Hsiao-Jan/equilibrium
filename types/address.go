@@ -24,8 +24,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
-	"github.com/kowala-tech/kcoin/client/crypto/sha3"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto/sha3"
 )
 
 const AddressLength = 20
@@ -49,15 +50,15 @@ func BigToAddress(b *big.Int) Address { return BytesToAddress(b.Bytes()) }
 
 // HexToAddress returns Address with byte values of s.
 // If s is larger than len(h), s will be cropped from the left.
-func HexToAddress(s string) Address { return BytesToAddress(FromHex(s)) }
+func HexToAddress(s string) Address { return BytesToAddress(common.FromHex(s)) }
 
 // IsHexAddress verifies whether a string can represent a valid hex-encoded
-// Ethereum address or not.
+// Kowala address or not.
 func IsHexAddress(s string) bool {
-	if hasHexPrefix(s) {
+	if common.HasHexPrefix(s) {
 		s = s[2:]
 	}
-	return len(s) == 2*AddressLength && isHex(s)
+	return len(s) == 2*AddressLength && common.IsHex(s)
 }
 
 // Bytes gets the string representation of the underlying address.
@@ -156,7 +157,7 @@ func NewMixedcaseAddressFromString(hexaddr string) (*MixedcaseAddress, error) {
 	if !IsHexAddress(hexaddr) {
 		return nil, fmt.Errorf("Invalid address")
 	}
-	a := FromHex(hexaddr)
+	a := common.FromHex(hexaddr)
 	return &MixedcaseAddress{addr: BytesToAddress(a), original: hexaddr}, nil
 }
 

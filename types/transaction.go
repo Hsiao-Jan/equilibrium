@@ -18,9 +18,9 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
 //go:generate gencodec -type txData -field-override txDataMarshaling -out gen_tx_json.go
@@ -37,7 +37,7 @@ type txData struct {
 	S *big.Int `json:"s" gencodec:"required"`
 
 	// This is only used when marshaling to JSON.
-	Hash *common.Hash `json:"hash" rlp:"-"`
+	Hash *Hash `json:"hash" rlp:"-"`
 }
 
 type txDataMarshaling struct {
@@ -59,7 +59,7 @@ type Transaction struct {
 	from atomic.Value
 }
 
-func NewTransaction(nonce uint64, receiver common.Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+func NewTransaction(nonce uint64, receiver Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	return newTransaction(nonce, &receiver, amount, computeLimit, payload)
 }
 
@@ -67,7 +67,7 @@ func NewContractCreation(nonce uint64, amount *big.Int, computeLimit uint64, pay
 	return newTransaction(nonce, nil, amount, computeLimit, payload)
 }
 
-func newTransaction(nonce uint64, receiver *common.Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+func newTransaction(nonce uint64, receiver *Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	if len(payload) > 0 {
 		data = common.CopyBytes(data)
 	}
@@ -91,9 +91,9 @@ func newTransaction(nonce uint64, receiver *common.Address, amount *big.Int, com
 
 // Hash hashes the RLP encoding of tx.
 // It uniquely identifies the transaction.
-func (tx *Transaction) Hash() common.Hash {
+func (tx *Transaction) Hash() Hash {
 	if hash := tx.hash.Load(); hash != nil {
-		return hash.(common.Hash)
+		return hash.(Hash)
 	}
 	v := rlpHash(tx)
 	tx.hash.Store(v)
@@ -108,7 +108,9 @@ func (tx *Transaction) ComputeFee() *big.Int {
 	return new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.GasLimit))
 }
 
-// Cost returns amount + fixed compute unit price * compute limit + stability fee.
+// Cost returns the transaction cost for a specific stabilization level.
+// NOTE: The result is used as an estimation as the transaction can be subject 
+// to a different stabilization level as soon as it's committed.
 func (tx *Transaction) Cost(stabilizationLevel uint64) *big.Int {
 	total := new(big.Int).Add(tx.ComputeFee(), tx.StabilityFee(stabilizationLevel))
 	return total.Add(total, tx.Value())

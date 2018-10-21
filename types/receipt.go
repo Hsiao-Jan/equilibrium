@@ -149,6 +149,11 @@ func (r *Receipt) Size() common.StorageSize {
 	return size
 }
 
+// TotalAmount lists the total amount that has been payed.
+func (r *Receipt) TotalAmount() *big.Int {
+	return new(big.Int).Add(r.ComputeFee, r.StabilityFee)
+}
+
 func (r *Receipt) String() string {
 	return fmt.Sprintf(`
 TxHash:			 	%s
