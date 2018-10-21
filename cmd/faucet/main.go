@@ -1,4 +1,4 @@
-// Copyright © 2018 Kowala SEZC <info@kowala.tech>
+// Copyright © 2018 NAME HERE <EMAIL ADDRESS>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package params
+package main
 
-import (
-	"github.com/kowala-tech/equilibrium/params/effort"
-)
+import "github.com/kowala-tech/equilibrium/cmd/faucet/cmd"
 
-var (
-	// ComputeCapacity refers to the maximum computational effort supported by the consensus protocol per block.
-	ComputeCapacity = 100 * effort.Transaction
-
-	// OracleReportInterval represents the time interval (in blocks) between reports.
-	OracleReportInterval = 900
-
-	// OracleReportStart represents the moment from which oracles are expected to present a report.
-	OracleReportStart = OracleReportInterval - 15
-)
+func main() {
+	cmd.Execute()
+}

@@ -27,3 +27,9 @@ type Signer interface {
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
 }
+
+// deriveSigner makes a *best* guess about which signer to use.
+func deriveSigner(V *big.Int) Signer {
+	// @TODO (rgeraldes)
+	return NewAndromedaSigner(deriveChainID(V))
+}

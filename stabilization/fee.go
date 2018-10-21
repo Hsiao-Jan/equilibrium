@@ -26,8 +26,8 @@ var (
 	TxPercentage = new(big.Int).SetUint64(params.StabilityFeeTxPercentage)
 )
 
-// CalcFee returns the stability fee for a specific a compute fee, stabilization level and transaction amount.
-func CalcFee(computeFee *big.Int, stabilizationLevel uint64, txAmount *big.Int) *big.Int {
+// Fee returns the stability fee for a specific a compute fee, stabilization level and transaction amount.
+func Fee(computeFee *big.Int, stabilizationLevel uint64, txAmount *big.Int) *big.Int {
 	if stabilizationLevel == 0 {
 		return common.Big0
 	}

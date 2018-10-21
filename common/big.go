@@ -21,3 +21,11 @@ import (
 var (
 	Big100 = new(big.Int).SetUint64(100)
 )
+
+// Min returns the smallest big int
+func Min(b1 *big.Int, b2 *big.Int) *big.Int {
+	if b1.Cmp(b2) <= 0 {
+		return b1
+	}
+	return b2
+}
