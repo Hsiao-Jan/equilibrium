@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kowala-tech/kcoin/client/log"
+	"go.uber.org/zap"
+
+	"github.com/kowala-tech/equilibrium/log"
 	"gopkg.in/fatih/set.v0"
 )
 
@@ -43,7 +45,7 @@ func (fc *fileCache) scan(keyDir string) (set.Interface, set.Interface, set.Inte
 		// Skip any non-key files from the folder
 		path := filepath.Join(keyDir, fi.Name())
 		if skipKeyFile(fi) {
-			log.Trace("Ignoring file on account scan", "path", path)
+			log.Debug("Ignoring file on account scan", zap.String("path", path))
 			continue
 		}
 		// Gather the set of all and fresly modified files

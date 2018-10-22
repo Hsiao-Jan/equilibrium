@@ -22,55 +22,55 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/kowala-tech/kcoin/client/accounts/abi"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/crypto"
+	"github.com/kowala-tech/equilibrium/accounts/abi"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 // makeTopics converts a filter query argument list into a filter topic set.
-func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
-	topics := make([][]common.Hash, len(query))
+func makeTopics(query ...[]interface{}) ([][]types.Hash, error) {
+	topics := make([][]types.Hash, len(query))
 	for i, filter := range query {
 		for _, rule := range filter {
-			var topic common.Hash
+			var topic types.Hash
 
 			// Try to generate the topic based on simple types
 			switch rule := rule.(type) {
-			case common.Hash:
+			case types.Hash:
 				copy(topic[:], rule[:])
-			case common.Address:
-				copy(topic[common.HashLength-common.AddressLength:], rule[:])
+			case types.Address:
+				copy(topic[types.HashLength-types.AddressLength:], rule[:])
 			case *big.Int:
 				blob := rule.Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case bool:
 				if rule {
-					topic[common.HashLength-1] = 1
+					topic[types.HashLength-1] = 1
 				}
 			case int8:
 				blob := big.NewInt(int64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case int16:
 				blob := big.NewInt(int64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case int32:
 				blob := big.NewInt(int64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case int64:
 				blob := big.NewInt(rule).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case uint8:
 				blob := new(big.Int).SetUint64(uint64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case uint16:
 				blob := new(big.Int).SetUint64(uint64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case uint32:
 				blob := new(big.Int).SetUint64(uint64(rule)).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case uint64:
 				blob := new(big.Int).SetUint64(rule).Bytes()
-				copy(topic[common.HashLength-len(blob):], blob)
+				copy(topic[types.HashLength-len(blob):], blob)
 			case string:
 				hash := crypto.Keccak256Hash([]byte(rule))
 				copy(topic[:], hash[:])
@@ -84,7 +84,7 @@ func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
 
 				switch {
 				case val.Kind() == reflect.Array && reflect.TypeOf(rule).Elem().Kind() == reflect.Uint8:
-					reflect.Copy(reflect.ValueOf(topic[common.HashLength-val.Len():]), val)
+					reflect.Copy(reflect.ValueOf(topic[types.HashLength-val.Len():]), val)
 
 				default:
 					return nil, fmt.Errorf("unsupported indexed type: %T", rule)
@@ -98,8 +98,8 @@ func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
 
 // Big batch of reflect types for topic reconstruction.
 var (
-	reflectHash    = reflect.TypeOf(common.Hash{})
-	reflectAddress = reflect.TypeOf(common.Address{})
+	reflectHash    = reflect.TypeOf(types.Hash{})
+	reflectAddress = reflect.TypeOf(types.Address{})
 	reflectBigInt  = reflect.TypeOf(new(big.Int))
 )
 
@@ -107,7 +107,7 @@ var (
 //
 // Note, dynamic types cannot be reconstructed since they get mapped to Keccak256
 // hashes as the topic value!
-func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) error {
+func parseTopics(out interface{}, fields abi.Arguments, topics []types.Hash) error {
 	// Sanity check that the fields and topics match up
 	if len(fields) != len(topics) {
 		return errors.New("topic/field count mismatch")
@@ -122,7 +122,7 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 		// Try to parse the topic back into the fields based on primitive types
 		switch field.Kind() {
 		case reflect.Bool:
-			if topics[0][common.HashLength-1] == 1 {
+			if topics[0][types.HashLength-1] == 1 {
 				field.Set(reflect.ValueOf(true))
 			}
 		case reflect.Int8:
@@ -164,8 +164,8 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 				field.Set(reflect.ValueOf(topics[0]))
 
 			case reflectAddress:
-				var addr common.Address
-				copy(addr[:], topics[0][common.HashLength-common.AddressLength:])
+				var addr types.Address
+				copy(addr[:], topics[0][types.HashLength-types.AddressLength:])
 				field.Set(reflect.ValueOf(addr))
 
 			case reflectBigInt:
@@ -176,7 +176,7 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 				// Ran out of custom types, try the crazies
 				switch {
 				case arg.Type.T == abi.FixedBytesTy:
-					reflect.Copy(field, reflect.ValueOf(topics[0][common.HashLength-arg.Type.Size:]))
+					reflect.Copy(field, reflect.ValueOf(topics[0][types.HashLength-arg.Type.Size:]))
 
 				default:
 					return fmt.Errorf("unsupported indexed type: %v", arg.Type)

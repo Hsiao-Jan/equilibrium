@@ -26,11 +26,10 @@ import (
 	"time"
 
 	"github.com/karalabe/hid"
-	kowala "github.com/kowala-tech/kcoin/client"
-	"github.com/kowala-tech/kcoin/client/accounts"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/log"
+	eqb "github.com/kowala-tech/equilibrium"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 // Maximum time between wallet health checks to detect USB unplugs.
@@ -61,11 +60,11 @@ type driver interface {
 
 	// Derive sends a derivation request to the USB device and returns the Kowala
 	// address located on that path.
-	Derive(path accounts.DerivationPath) (common.Address, error)
+	Derive(path accounts.DerivationPath) (types.Address, error)
 
 	// SignTx sends the transaction to the USB device and waits for the user to confirm
 	// or deny the transaction.
-	SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error)
+	SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (types.Address, *types.Transaction, error)
 }
 
 // wallet represents the common functionality shared by all USB hardware
@@ -79,12 +78,12 @@ type wallet struct {
 	info   hid.DeviceInfo // Known USB device infos about the wallet
 	device *hid.Device    // USB device advertising itself as a hardware wallet
 
-	accounts []accounts.Account                         // List of derive accounts pinned on the hardware wallet
-	paths    map[common.Address]accounts.DerivationPath // Known derivation paths for signing operations
+	accounts []accounts.Account                        // List of derive accounts pinned on the hardware wallet
+	paths    map[types.Address]accounts.DerivationPath // Known derivation paths for signing operations
 
 	deriveNextPath accounts.DerivationPath // Next derivation path for account auto-discovery
-	deriveNextAddr common.Address          // Next derived account address for auto-discovery
-	deriveChain    kowala.ChainStateReader // Blockchain state reader to discover used account with
+	deriveNextAddr types.Address           // Next derived account address for auto-discovery
+	deriveChain    eqb.ChainStateReader    // Blockchain state reader to discover used account with
 	deriveReq      chan chan struct{}      // Channel to request a self-derivation on
 	deriveQuit     chan chan error         // Channel to terminate the self-deriver with
 
@@ -158,7 +157,7 @@ func (w *wallet) Open(passphrase string) error {
 		return err
 	}
 	// Connection successful, start life-cycle management
-	w.paths = make(map[common.Address]accounts.DerivationPath)
+	w.paths = make(map[types.Address]accounts.DerivationPath)
 
 	w.deriveReq = make(chan chan struct{})
 	w.deriveQuit = make(chan chan error)
@@ -347,7 +346,7 @@ func (w *wallet) selfDerive() {
 		)
 		for empty := false; !empty; {
 			// Retrieve the next derived Kowala account
-			if nextAddr == (common.Address{}) {
+			if nextAddr == (types.Address{}) {
 				if nextAddr, err = w.driver.Derive(nextPath); err != nil {
 					w.log.Warn("USB wallet account derivation failed", "err", err)
 					break
@@ -389,7 +388,7 @@ func (w *wallet) selfDerive() {
 			}
 			// Fetch the next potential account
 			if !empty {
-				nextAddr = common.Address{}
+				nextAddr = types.Address{}
 				nextPath[len(nextPath)-1]++
 			}
 		}
@@ -484,14 +483,14 @@ func (w *wallet) Derive(path accounts.DerivationPath, pin bool) (accounts.Accoun
 // user used previously (based on the chain state), but ones that he/she did not
 // explicitly pin to the wallet manually. To avoid chain head monitoring, self
 // derivation only runs during account listing (and even then throttled).
-func (w *wallet) SelfDerive(base accounts.DerivationPath, chain kowala.ChainStateReader) {
+func (w *wallet) SelfDerive(base accounts.DerivationPath, chain eqb.ChainStateReader) {
 	w.stateLock.Lock()
 	defer w.stateLock.Unlock()
 
 	w.deriveNextPath = make(accounts.DerivationPath, len(base))
 	copy(w.deriveNextPath[:], base[:])
 
-	w.deriveNextAddr = common.Address{}
+	w.deriveNextAddr = types.Address{}
 	w.deriveChain = chain
 }
 

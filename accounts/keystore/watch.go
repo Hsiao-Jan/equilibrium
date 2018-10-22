@@ -21,7 +21,7 @@ package keystore
 import (
 	"time"
 
-	"github.com/kowala-tech/kcoin/client/log"
+	"github.com/kowala-tech/equilibrium/log"
 	"github.com/rjeczalik/notify"
 )
 

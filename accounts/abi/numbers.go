@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/math"
+	"github.com/kowala-tech/equilibrium/common/math"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 	int16T    = reflect.TypeOf(int16(0))
 	int32T    = reflect.TypeOf(int32(0))
 	int64T    = reflect.TypeOf(int64(0))
-	addressT  = reflect.TypeOf(common.Address{})
+	addressT  = reflect.TypeOf(types.Address{})
 )
 
 // U256 converts a big Int into a 256bit EVM number.

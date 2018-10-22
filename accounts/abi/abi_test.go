@@ -26,8 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/crypto"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 const jsondata = `
@@ -645,7 +646,7 @@ func TestUnpackEvent(t *testing.T) {
 	}
 
 	type ReceivedEvent struct {
-		Address common.Address
+		Address types.Address
 		Amount  *big.Int
 		Memo    []byte
 	}
@@ -659,7 +660,7 @@ func TestUnpackEvent(t *testing.T) {
 	}
 
 	type ReceivedAddrEvent struct {
-		Address common.Address
+		Address types.Address
 	}
 	var receivedAddrEv ReceivedAddrEvent
 	err = abi.Unpack(&receivedAddrEv, "receivedAddr", data)

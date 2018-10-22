@@ -33,11 +33,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kowala-tech/kcoin/client/accounts"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/crypto"
-	"github.com/kowala-tech/kcoin/client/event"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/event"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var (
@@ -57,10 +56,10 @@ const walletRefreshCycle = 3 * time.Second
 
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
-	storage  keyStore                     // Storage backend, might be cleartext or encrypted
-	cache    *accountCache                // In-memory account cache over the filesystem storage
-	changes  chan struct{}                // Channel receiving change notifications from the cache
-	unlocked map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
+	storage  keyStore                    // Storage backend, might be cleartext or encrypted
+	cache    *accountCache               // In-memory account cache over the filesystem storage
+	changes  chan struct{}               // Channel receiving change notifications from the cache
+	unlocked map[types.Address]*unlocked // Currently unlocked account (decrypted private keys)
 
 	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
 	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
@@ -98,7 +97,7 @@ func (ks *KeyStore) init(keydir string) {
 	defer ks.mu.Unlock()
 
 	// Initialize the set of unlocked keys and the account cache
-	ks.unlocked = make(map[common.Address]*unlocked)
+	ks.unlocked = make(map[types.Address]*unlocked)
 	ks.cache, ks.changes = newAccountCache(keydir)
 
 	// TODO: In order for this finalizer to work, there must be no references
@@ -219,7 +218,7 @@ func (ks *KeyStore) updater() {
 }
 
 // HasAddress reports whether a key with the given address is present.
-func (ks *KeyStore) HasAddress(addr common.Address) bool {
+func (ks *KeyStore) HasAddress(addr types.Address) bool {
 	return ks.cache.hasAddress(addr)
 }
 
@@ -277,7 +276,7 @@ func (ks *KeyStore) SignTx(a accounts.Account, tx *types.Transaction, chainID *b
 	if !found {
 		return nil, ErrLocked
 	}
-	
+
 	return types.SignTx(tx, types.NewAndromedaSigner(chainID), unlockedKey.PrivateKey)
 }
 
@@ -339,7 +338,7 @@ func (ks *KeyStore) Unlock(a accounts.Account, passphrase string) error {
 }
 
 // Lock removes the private key with the given address from memory.
-func (ks *KeyStore) Lock(addr common.Address) error {
+func (ks *KeyStore) Lock(addr types.Address) error {
 	ks.mu.Lock()
 	if unl, found := ks.unlocked[addr]; found {
 		ks.mu.Unlock()
@@ -404,7 +403,7 @@ func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.A
 	return a, key, err
 }
 
-func (ks *KeyStore) expire(addr common.Address, u *unlocked, timeout time.Duration) {
+func (ks *KeyStore) expire(addr types.Address, u *unlocked, timeout time.Duration) {
 	t := time.NewTimer(timeout)
 	defer t.Stop()
 	select {

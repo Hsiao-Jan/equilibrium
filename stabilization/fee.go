@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package stability
+package stabilization
 
-/*
+import (
+	"math/big"
+
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/params"
+)
+
 var (
-	Increase     = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityIncreasePercentage))
+	increase     = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityFeeIncreasePercentage))
 	TxPercentage = new(big.Int).SetUint64(params.StabilityFeeTxPercentage)
 )
 
@@ -41,4 +47,3 @@ func Fee(computeFee *big.Int, stabilizationLevel uint64, txAmount *big.Int) *big
 
 	return common.Min(fee, maxFee)
 }
-*/

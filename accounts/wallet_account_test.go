@@ -1,13 +1,14 @@
 package accounts
 
 import (
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/kowala-tech/equilibrium/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewWalletAccount(t *testing.T) {
-	address := common.Address{1}
+	address := types.Address{1}
 	account := Account{Address: address}
 	wallet := &MockWallet{}
 	wallet.On("Contains", account).Return(true)
@@ -19,7 +20,7 @@ func TestNewWalletAccount(t *testing.T) {
 }
 
 func TestNewWalletAccountFailsIfAddressDoesntExistInWallet(t *testing.T) {
-	address := common.Address{1}
+	address := types.Address{1}
 	account := Account{Address: address}
 	wallet := &MockWallet{}
 	wallet.On("Contains", account).Return(false)

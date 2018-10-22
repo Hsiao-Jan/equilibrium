@@ -34,7 +34,7 @@ var (
 type ServiceContext struct {
 	cfg             *Config
 	services        map[reflect.Type]Service // Index of the already constructed services
-	GlobalEventMux  *event.TypeMux           // Event multiplexer used for decoupled notifications
+	EventMux        *event.TypeMux           // Event multiplexer used for decoupled notifications
 	AccountManager  *accounts.Manager        // Account manager created by the node.
 	ConsensusEngine consensus.Engine         // Consensus Engine used by the node.
 }

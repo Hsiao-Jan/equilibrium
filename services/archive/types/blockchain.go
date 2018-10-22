@@ -16,22 +16,21 @@ import (
 	"github.com/kowala-tech/equilibrium/common/mclock"
 	"github.com/kowala-tech/equilibrium/core/rawdb"
 	"github.com/kowala-tech/equilibrium/core/state"
-	"github.com/kowala-tech/equilibrium/core/vm"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/kcoindb"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/metrics"
 	"github.com/kowala-tech/equilibrium/params"
 	"github.com/kowala-tech/equilibrium/trie"
 	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/equilibrium/vm"
 	"github.com/kowala-tech/kcoin/client/consensus"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 var (
-	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
+	//blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 
 	ErrNoGenesis = errors.New("Genesis not found in chain")
 )
@@ -45,7 +44,7 @@ const (
 	triesInMemory       = 128
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
-	BlockChainVersion = 3
+	BlockChainVersion = 1
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning

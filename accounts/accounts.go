@@ -21,17 +21,16 @@ import (
 	"context"
 	"math/big"
 
-	kcoin "github.com/kowala-tech/kcoin/client"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/event"
+	"github.com/kowala-tech/equilibrium/event"
+	eqb "github.com/kowala-tech/equilibrium/event"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 // Account represents a Kowala account located at a specific location defined
 // by the optional URL field.
 type Account struct {
-	Address common.Address `json:"address"` // Kowala account address derived from the key
-	URL     URL            `json:"url"`     // Optional resource locator within a backend
+	Address types.Address `json:"address"` // Kowala account address derived from the key
+	URL     URL           `json:"url"`     // Optional resource locator within a backend
 }
 
 // Wallet represents a software or hardware wallet that might contain one or more
@@ -86,7 +85,7 @@ type Wallet interface {
 	//
 	// You can disable automatic account discovery by calling SelfDerive with a nil
 	// chain state reader.
-	SelfDerive(base DerivationPath, chain kcoin.ChainStateReader)
+	SelfDerive(base DerivationPath, chain eqb.ChainStateReader)
 
 	// SignHash requests the wallet to sign the given hash.
 	//
@@ -138,9 +137,9 @@ type Wallet interface {
 }
 
 type TransactOpts struct {
-	From   common.Address // Kowala account to send the transaction from
-	Nonce  *big.Int       // Nonce to use for the transaction execution (nil = use pending state)
-	Signer SignerFn       // Method to use for signing the transaction (mandatory)
+	From   types.Address // Kowala account to send the transaction from
+	Nonce  *big.Int      // Nonce to use for the transaction execution (nil = use pending state)
+	Signer SignerFn      // Method to use for signing the transaction (mandatory)
 
 	Amount       *big.Int // Funds to transfer along along the transaction (nil = 0 = no funds)
 	ComputeLimit *big.Int // Compute limit to set for the transaction execution (nil = estimate + 10%)
@@ -148,7 +147,7 @@ type TransactOpts struct {
 	Context context.Context // Network context to support cancellation and timeouts (nil = no timeout)
 }
 
-type SignerFn func(types.Signer, common.Address, *types.Transaction) (*types.Transaction, error)
+type SignerFn func(types.Signer, types.Address, *types.Transaction) (*types.Transaction, error)
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can
 // sign transactions with and upon request, do so.

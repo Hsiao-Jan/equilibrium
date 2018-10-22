@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/kowala-tech/kcoin/client/event"
+	"github.com/kowala-tech/equilibrium/event"
 )
 
 // Manager is an overarching account manager that can communicate with various

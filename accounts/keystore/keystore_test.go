@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kowala-tech/kcoin/client/accounts"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/event"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/event"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var testSigData = make([]byte, 32)
@@ -304,7 +305,7 @@ func TestWalletNotifications(t *testing.T) {
 
 	// Randomly add and remove accounts.
 	var (
-		live       = make(map[common.Address]accounts.Account)
+		live       = make(map[types.Address]accounts.Account)
 		wantEvents []walletEvent
 	)
 	for i := 0; i < 1024; i++ {
@@ -339,7 +340,7 @@ func TestWalletNotifications(t *testing.T) {
 }
 
 // checkAccounts checks that all known live accounts are present in the wallet list.
-func checkAccounts(t *testing.T, live map[common.Address]accounts.Account, wallets []accounts.Wallet) {
+func checkAccounts(t *testing.T, live map[types.Address]accounts.Account, wallets []accounts.Wallet) {
 	if len(live) != len(wallets) {
 		t.Errorf("wallet list doesn't match required accounts: have %d, want %d", len(wallets), len(live))
 		return

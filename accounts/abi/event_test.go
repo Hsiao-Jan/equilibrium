@@ -25,8 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/crypto"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,14 +84,14 @@ var mixedCaseData1 = "0000000000000000000000000000000000000000000000000000000000
 func TestEventId(t *testing.T) {
 	var table = []struct {
 		definition   string
-		expectations map[string]common.Hash
+		expectations map[string]types.Hash
 	}{
 		{
 			definition: `[
 			{ "type" : "event", "name" : "balance", "inputs": [{ "name" : "in", "type": "uint256" }] },
 			{ "type" : "event", "name" : "check", "inputs": [{ "name" : "t", "type": "address" }, { "name": "b", "type": "uint256" }] }
 			]`,
-			expectations: map[string]common.Hash{
+			expectations: map[string]types.Hash{
 				"balance": crypto.Keccak256Hash([]byte("balance(uint256)")),
 				"check":   crypto.Keccak256Hash([]byte("check(address,uint256)")),
 			},
@@ -159,7 +160,7 @@ func TestEventTupleUnpack(t *testing.T) {
 	}
 
 	type EventPledge struct {
-		Who      common.Address
+		Who      types.Address
 		Wad      *big.Int
 		Currency [3]byte
 	}
@@ -242,7 +243,7 @@ func TestEventTupleUnpack(t *testing.T) {
 		"Can unpack Pledge event into structure",
 	}, {
 		pledgeData1,
-		&[]interface{}{&common.Address{}, &bigint, &[3]byte{}},
+		&[]interface{}{&types.Address{}, &bigint, &[3]byte{}},
 		&[]interface{}{
 			&addr,
 			&bigintExpected2,
@@ -252,7 +253,7 @@ func TestEventTupleUnpack(t *testing.T) {
 		"Can unpack Pledge event into slice",
 	}, {
 		pledgeData1,
-		&[3]interface{}{&common.Address{}, &bigint, &[3]byte{}},
+		&[3]interface{}{&types.Address{}, &bigint, &[3]byte{}},
 		&[3]interface{}{
 			&addr,
 			&bigintExpected2,
@@ -265,18 +266,18 @@ func TestEventTupleUnpack(t *testing.T) {
 		&[]interface{}{new(int), 0, 0},
 		&[]interface{}{},
 		jsonEventPledge,
-		"abi: cannot unmarshal common.Address in to int",
+		"abi: cannot unmarshal types.Address in to int",
 		"Can not unpack Pledge event into slice with wrong types",
 	}, {
 		pledgeData1,
 		&BadEventPledge{},
 		&BadEventPledge{},
 		jsonEventPledge,
-		"abi: cannot unmarshal common.Address in to string",
+		"abi: cannot unmarshal types.Address in to string",
 		"Can not unpack Pledge event into struct with wrong filed types",
 	}, {
 		pledgeData1,
-		&[]interface{}{common.Address{}, new(big.Int)},
+		&[]interface{}{types.Address{}, new(big.Int)},
 		&[]interface{}{},
 		jsonEventPledge,
 		"abi: insufficient number of elements in the list/array for unpack, want 3, got 2",

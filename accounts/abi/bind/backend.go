@@ -5,9 +5,8 @@ import (
 	"errors"
 	"math/big"
 
-	kcoin "github.com/kowala-tech/kcoin/client"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
+	eqb "github.com/kowala-tech/equilibrium"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var (
@@ -30,10 +29,10 @@ var (
 type ContractCaller interface {
 	// CodeAt returns the code of the given account. This is needed to differentiate
 	// between contract internal errors and the local chain being out of sync.
-	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
+	CodeAt(ctx context.Context, contract types.Address, blockNumber *big.Int) ([]byte, error)
 	// ContractCall executes an Kowala contract call with the specified data as the
 	// input.
-	CallContract(ctx context.Context, call kcoin.CallMsg, blockNumber *big.Int) ([]byte, error)
+	CallContract(ctx context.Context, call eqb.CallMsg, blockNumber *big.Int) ([]byte, error)
 }
 
 // PendingContractCaller defines methods to perform contract calls on the pending state.
@@ -41,9 +40,9 @@ type ContractCaller interface {
 // If the backend does not support the pending state, Call returns ErrNoPendingState.
 type PendingContractCaller interface {
 	// PendingCodeAt returns the code of the given account in the pending state.
-	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
+	PendingCodeAt(ctx context.Context, contract types.Address) ([]byte, error)
 	// PendingCallContract executes an Kowala contract call against the pending state.
-	PendingCallContract(ctx context.Context, call kcoin.CallMsg) ([]byte, error)
+	PendingCallContract(ctx context.Context, call eqb.CallMsg) ([]byte, error)
 }
 
 // ContractTransactor defines the methods needed to allow operating with contract
@@ -52,9 +51,9 @@ type PendingContractCaller interface {
 // to the transactor to decide.
 type ContractTransactor interface {
 	// PendingCodeAt returns the code of the given account in the pending state.
-	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
+	PendingCodeAt(ctx context.Context, account types.Address) ([]byte, error)
 	// PendingNonceAt retrieves the current pending nonce associated with an account.
-	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
+	PendingNonceAt(ctx context.Context, account types.Address) (uint64, error)
 	// SuggestGasPrice retrieves the currently suggested gas price to allow a timely
 	// execution of a transaction.
 	// EstimateComputationalEffort tries to estimate the required computational
@@ -62,7 +61,7 @@ type ContractTransactor interface {
 	// the backend blockchain. There is no guarantee that this is the true required
 	// effort as other transactions may be added or removed by miners, but it
 	// should provide a basis for setting a reasonable default.
-	EstimateComputationalEffort(ctx context.Context, call kcoin.CallMsg) (effort uint64, err error)
+	EstimateComputationalEffort(ctx context.Context, call eqb.CallMsg) (effort uint64, err error)
 	// SendTransaction injects the transaction into the pending pool for execution.
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
@@ -74,17 +73,17 @@ type ContractFilterer interface {
 	// returning all the results in one batch.
 	//
 	// TODO(karalabe): Deprecate when the subscription one can return past data too.
-	FilterLogs(ctx context.Context, query kcoin.FilterQuery) ([]types.Log, error)
+	FilterLogs(ctx context.Context, query eqb.FilterQuery) ([]types.Log, error)
 
 	// SubscribeFilterLogs creates a background log filtering operation, returning
 	// a subscription immediately, which can be used to stream the found events.
-	SubscribeFilterLogs(ctx context.Context, query kcoin.FilterQuery, ch chan<- types.Log) (kcoin.Subscription, error)
+	SubscribeFilterLogs(ctx context.Context, query eqb.FilterQuery, ch chan<- types.Log) (eqb.Subscription, error)
 }
 
 // DeployBackend wraps the operations needed by WaitMined and WaitDeployed.
 type DeployBackend interface {
-	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
-	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
+	TransactionReceipt(ctx context.Context, txHash types.Hash) (*types.Receipt, error)
+	CodeAt(ctx context.Context, account types.Address, blockNumber *big.Int) ([]byte, error)
 }
 
 // ContractBackend defines the methods needed to work with contracts on a read-write basis.

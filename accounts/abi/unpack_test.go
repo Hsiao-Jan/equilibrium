@@ -26,7 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kowala-tech/kcoin/client/common"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,7 +121,7 @@ var unpackTests = []unpackTest{
 	{
 		def:  `[{"type": "address"}]`,
 		enc:  "0000000000000000000000000100000000000000000000000000000000000000",
-		want: common.Address{1},
+		want: types.Address{1},
 	},
 	{
 		def:  `[{"type": "bytes32"}]`,
@@ -684,7 +685,7 @@ func TestUnmarshal(t *testing.T) {
 	buff.Write(common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000001")) // size
 	buff.Write(common.Hex2Bytes("0000000000000000000000000100000000000000000000000000000000000000"))
 
-	var outAddr []common.Address
+	var outAddr []types.Address
 	err = abi.Unpack(&outAddr, "addressSliceSingle", buff.Bytes())
 	if err != nil {
 		t.Fatal("didn't expect error:", err)
@@ -694,8 +695,8 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatal("expected 1 item, got", len(outAddr))
 	}
 
-	if outAddr[0] != (common.Address{1}) {
-		t.Errorf("expected %x, got %x", common.Address{1}, outAddr[0])
+	if outAddr[0] != (types.Address{1}) {
+		t.Errorf("expected %x, got %x", types.Address{1}, outAddr[0])
 	}
 
 	// marshal multiple address slice
@@ -709,8 +710,8 @@ func TestUnmarshal(t *testing.T) {
 	buff.Write(common.Hex2Bytes("0000000000000000000000000300000000000000000000000000000000000000"))
 
 	var outAddrStruct struct {
-		A []common.Address
-		B []common.Address
+		A []types.Address
+		B []types.Address
 	}
 	err = abi.Unpack(&outAddrStruct, "addressSliceDouble", buff.Bytes())
 	if err != nil {
@@ -721,19 +722,19 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatal("expected 1 item, got", len(outAddrStruct.A))
 	}
 
-	if outAddrStruct.A[0] != (common.Address{1}) {
-		t.Errorf("expected %x, got %x", common.Address{1}, outAddrStruct.A[0])
+	if outAddrStruct.A[0] != (types.Address{1}) {
+		t.Errorf("expected %x, got %x", types.Address{1}, outAddrStruct.A[0])
 	}
 
 	if len(outAddrStruct.B) != 2 {
 		t.Fatal("expected 1 item, got", len(outAddrStruct.B))
 	}
 
-	if outAddrStruct.B[0] != (common.Address{2}) {
-		t.Errorf("expected %x, got %x", common.Address{2}, outAddrStruct.B[0])
+	if outAddrStruct.B[0] != (types.Address{2}) {
+		t.Errorf("expected %x, got %x", types.Address{2}, outAddrStruct.B[0])
 	}
-	if outAddrStruct.B[1] != (common.Address{3}) {
-		t.Errorf("expected %x, got %x", common.Address{3}, outAddrStruct.B[1])
+	if outAddrStruct.B[1] != (types.Address{3}) {
+		t.Errorf("expected %x, got %x", types.Address{3}, outAddrStruct.B[1])
 	}
 
 	// marshal invalid address slice

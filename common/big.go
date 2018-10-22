@@ -19,6 +19,10 @@ import (
 )
 
 var (
+	Big0   = new(big.Int).SetUint64(0)
+	Big1   = new(big.Int).SetUint64(1)
+	Big8   = new(big.Int).SetUint64(8)
+	Big32  = new(big.Int).SetUint64(32)
 	Big100 = new(big.Int).SetUint64(100)
 )
 

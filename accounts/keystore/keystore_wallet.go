@@ -4,11 +4,10 @@ import (
 	"errors"
 	"math/big"
 
-	ethereum "github.com/kowala-tech/kcoin/client"
-	"github.com/kowala-tech/kcoin/client/accounts"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/crypto"
+	eqb "github.com/kowala-tech/equilibrium"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original
@@ -63,7 +62,7 @@ func (w *keystoreWallet) Derive(path accounts.DerivationPath, pin bool) (account
 
 // SelfDerive implements accounts.Wallet, but is a noop for plain wallets since
 // there is no notion of hierarchical account derivation for plain keystore accounts.
-func (w *keystoreWallet) SelfDerive(base accounts.DerivationPath, chain ethereum.ChainStateReader) {}
+func (w *keystoreWallet) SelfDerive(base accounts.DerivationPath, chain eqb.ChainStateReader) {}
 
 // SignHash implements accounts.Wallet, attempting to sign the given hash with
 // the given account. If the wallet does not wrap this particular account, an
@@ -167,7 +166,7 @@ func newKeyedTransactor(ks *KeyStore, a accounts.Account, auth string) *accounts
 	keyAddr := crypto.PubkeyToAddress(key.PrivateKey.PublicKey)
 	return &accounts.TransactOpts{
 		From: keyAddr,
-		Signer: func(signer types.Signer, address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+		Signer: func(signer types.Signer, address types.Address, tx *types.Transaction) (*types.Transaction, error) {
 			if address != keyAddr {
 				return nil, errors.New("not authorized to sign this account")
 			}

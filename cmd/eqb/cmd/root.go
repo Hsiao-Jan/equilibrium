@@ -26,7 +26,6 @@ import (
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/p2p"
 	"github.com/kowala-tech/equilibrium/params"
-	"github.com/kowala-tech/equilibrium/services/archive"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
@@ -208,14 +207,14 @@ func startNode(stack *node.Node) {
 		log.Fatal("Error starting protocol stack", zap.Error(err))
 	}
 	go func() {
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(sigc)
-		<-sigc
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(sigCh)
+		<-sigCh
 		log.Info("Got interrupt, shutting down...")
 		go stack.Stop()
 		for i := 10; i > 0; i-- {
-			<-sigc
+			<-sigCh
 			if i > 1 {
 				log.Info("Already shutting down, interrupt more to panic.", zap.Int("times", i-1))
 			}
@@ -225,6 +224,7 @@ func startNode(stack *node.Node) {
 	}()
 }
 
+/*
 func RegisterArchiveService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return archive.New(ctx)
@@ -233,7 +233,7 @@ func RegisterArchiveService(stack *node.Node) {
 	}
 }
 
-/*
+
 func RegisterMiningService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var archiveService *archive.Service

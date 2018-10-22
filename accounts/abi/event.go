@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/crypto"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 // Event is an event potentially triggered by the EVM's LOG mechanism. The Event
@@ -46,7 +47,7 @@ func (e Event) String() string {
 
 // Id returns the canonical representation of the event's signature used by the
 // abi definition to identify event names and types.
-func (e Event) Id() common.Hash {
+func (e Event) Id() types.Hash {
 	types := make([]string, len(e.Inputs))
 	i := 0
 	for _, input := range e.Inputs {

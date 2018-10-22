@@ -14,7 +14,7 @@
 
 package params
 
-var (
+const (
 	// MaxTransactionsPerBlock refers to the maximum transactions supported by the consensus protocol per block.
 	MaxTransactionsPerBlock = 1000
 
@@ -23,4 +23,10 @@ var (
 
 	// OracleReportSubmissionPeriod represents the period of time available (in blocks) for the report submission.
 	OracleReportSubmissionPeriod = 15
+
+	// StabilityFeeIncreasePercentage
+	StabilityFeeIncreasePercentage = 2
+
+	// StabilityFeeTxPercentage
+	StabilityFeeTxPercentage = 2
 )
