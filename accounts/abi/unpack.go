@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/kowala-tech/kcoin/client/common"
+	"github.com/kowala-tech/equilibrium/common"
 )
 
 // reads the integer based on its kind

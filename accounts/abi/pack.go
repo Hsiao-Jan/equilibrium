@@ -20,8 +20,8 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/math"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/math"
 )
 
 // packBytesSlice packs the given bytes as [L, V] as the canonical representation
