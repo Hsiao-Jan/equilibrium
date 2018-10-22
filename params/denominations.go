@@ -14,13 +14,19 @@
 
 package params
 
-var (
-	// MaxTransactionsPerBlock refers to the maximum transactions supported by the consensus protocol per block.
-	MaxTransactionsPerBlock = 1000
-
-	// OracleReportInterval represents the time interval (in blocks) between reports.
-	OracleReportInterval = 900
-
-	// OracleReportSubmissionPeriod represents the period of time available (in blocks) for the report submission.
-	OracleReportSubmissionPeriod = 15
+const (
+	// These are the multipliers for kcoin denominations.
+	// Example: To get the wei value of an amount in 'douglas', use
+	//
+	//    new(big.Int).Mul(value, big.NewInt(params.Douglas))
+	//
+	Wei      = 1
+	Ada      = 1e3
+	Babbage  = 1e6
+	Shannon  = 1e9
+	Szabo    = 1e12
+	Finney   = 1e15
+	KCoin    = 1e18
+	Einstein = 1e21
+	Douglas  = 1e42
 )

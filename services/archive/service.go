@@ -17,16 +17,38 @@ package archive
 import (
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/kcoin/client/core"
 )
 
-type Service struct {
-	*Config
+// @TODO - consensus engine should be part of the service context
 
-	chain  *types.Blockchain
-	txPool *types.TxPool
+type Service struct {
+	cfg *Config
+
+	// handlers
+	blockchain *types.Blockchain
+	engine     consensus.engine
+	//txPool      *types.TxPool
+	//peerManager *PeerManager
+
 }
 
+// New retrieves a new instance of the archive service.
 func New(cfg *Config, ctx *node.ServiceContext) (*Service, error) {
+	service := &Service{
+		engine: ctx.ConsensusEngine,
+	}
+
+	/*
+		if !config.SyncMode.IsValid() {
+			return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
+		}
+	*/
+
+	kcoin.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, kcoin.chainConfig, service.engine, vmConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	return service, nil
 }

@@ -25,6 +25,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/kowala-tech/equilibrium/consensus"
+	"github.com/kowala-tech/equilibrium/consensus/konsensus"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/p2p"
@@ -75,6 +77,8 @@ type Node struct {
 	hostCfg p2p.Config
 	host    *p2p.Host
 
+	engine consensus.Engine
+
 	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
 	services     map[reflect.Type]Service // Currently running services
 
@@ -114,6 +118,7 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 		cfg:            cfg,
 		serviceFuncs:   []ServiceConstructor{},
 		globalEventMux: new(event.TypeMux),
+		engine:         konsensus.New(),
 	}, nil
 }
 

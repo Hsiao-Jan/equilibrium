@@ -14,13 +14,7 @@
 
 package stability
 
-import (
-	"math/big"
-
-	"github.com/kowala-tech/equilibrium/common"
-	"github.com/kowala-tech/kcoin/client/params"
-)
-
+/*
 var (
 	Increase     = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityIncreasePercentage))
 	TxPercentage = new(big.Int).SetUint64(params.StabilityFeeTxPercentage)
@@ -47,3 +41,4 @@ func Fee(computeFee *big.Int, stabilizationLevel uint64, txAmount *big.Int) *big
 
 	return common.Min(fee, maxFee)
 }
+*/

@@ -18,8 +18,10 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/kowala-tech/equilibrium/accounts"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
 var (
@@ -30,9 +32,11 @@ var (
 // the protocol stack, that is passed to all constructors to be optionally used;
 // as well as utility methods to operate on the service environment.
 type ServiceContext struct {
-	cfg            *Config
-	services       map[reflect.Type]Service
-	GlobalEventMux *event.TypeMux
+	cfg             *Config
+	services        map[reflect.Type]Service // Index of the already constructed services
+	GlobalEventMux  *event.TypeMux           // Event multiplexer used for decoupled notifications
+	AccountManager  *accounts.Manager        // Account manager created by the node.
+	ConsensusEngine consensus.Engine         // Consensus Engine used by the node.
 }
 
 // Service retrieves a currently running service registered of a specific type.

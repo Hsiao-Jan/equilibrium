@@ -9,9 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kowala-tech/kcoin/client/accounts"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/tx"
+	"github.com/kowala-tech/equilibrium/params/effort"
+
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/transaction"
 	engine "github.com/kowala-tech/kcoin/client/consensus"
 	"github.com/kowala-tech/kcoin/client/contracts/bindings/consensus"
 	"github.com/kowala-tech/kcoin/client/core"
@@ -35,6 +37,9 @@ var (
 )
 
 var (
+	// computeCapacity refers to the maximum computational effort supported by the consensus protocol per block.
+	computeCapacity = params.MaxTransactionsPerBlock * effort.Transaction
+
 	txConfirmationTimeout = 10 * time.Second
 )
 
@@ -341,7 +346,7 @@ func (val *validator) AddVote(vote *types.Vote) error {
 }
 
 func (val *validator) commitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
-	gp := new(core.GasPool).AddGas(val.header.GasLimit)
+	gp := new(core.GasPool).AddGas(computeCapacity)
 
 	var coalescedLogs []*types.Log
 
@@ -414,7 +419,7 @@ func (val *validator) commitTransactions(mux *event.TypeMux, txs *types.Transact
 func (val *validator) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool) (error, []*types.Log) {
 	snap := val.state.Snapshot()
 
-	receipt, _, err := core.ApplyTransaction(val.config, bc, &coinbase, gp, val.state, val.header, tx, &val.header.GasUsed, vm.Config{})
+	receipt, _, err := core.ApplyTransaction(val.config, bc, &coinbase, gp, val.state, val.header, tx, vm.Config{})
 	if err != nil {
 		val.state.RevertToSnapshot(snap)
 		return err, nil
@@ -430,7 +435,7 @@ func (val *validator) leave() {
 	if err != nil {
 		log.Error("failed to leave the election", "err", err)
 	}
-	receipt, err := tx.WaitMinedWithTimeout(val.backend, txHash, txConfirmationTimeout)
+	receipt, err := transaction.WaitMinedWithTimeout(val.backend, txHash, txConfirmationTimeout)
 	if err != nil {
 		log.Error("Failed to verify the voter deregistration", "err", err)
 	}
@@ -748,7 +753,7 @@ func (val *validator) RedeemDeposits() error {
 	if err != nil {
 		return err
 	}
-	receipt, err := tx.WaitMinedWithTimeout(val.backend, txHash, txConfirmationTimeout)
+	receipt, err := transaction.WaitMinedWithTimeout(val.backend, txHash, txConfirmationTimeout)
 	if err != nil {
 		return err
 	}
