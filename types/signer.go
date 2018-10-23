@@ -1,6 +1,7 @@
 package types
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -8,6 +9,11 @@ import (
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/kcoin/client/params"
+)
+
+var (
+	errInvalidSig     = errors.New("invalid v, r, s values")
+	errInvalidChainID = errors.New("invalid chain id for signer")
 )
 
 // @TODO (rgeraldes) - is equal necessary?
@@ -58,6 +64,8 @@ func NewProductionSigner(chainID *big.Int) *ProductionSigner {
 		signer.chainID.Set(chainID)
 		signer.chainIDMul.Mul(signer.chainID, big.NewInt(2))
 	}
+
+	return signer
 }
 
 func (s ProductionSigner) Equal(s2 Signer) bool {
@@ -70,7 +78,7 @@ func (s ProductionSigner) Sender(sn Sender) (Address, error) {
 		return UnsafeSigner{}.Sender(sn)
 	}
 	if sn.ChainID().Cmp(s.chainID) != 0 {
-		return Address{}, ErrInvalidChainID
+		return Address{}, errInvalidChainID
 	}
 
 	snR, snS, snV := sn.SignatureValues()
@@ -83,7 +91,7 @@ func (s ProductionSigner) Sender(sn Sender) (Address, error) {
 // SignatureValues returns a new signature. This signature
 // needs to be in the [R || S || V] format where V is 0 or 1.
 func (s ProductionSigner) SignatureValues(sig []byte) (R, S, V *big.Int, err error) {
-	R, S, V, err = UnprotectedSigner{}.SignatureValues(sig)
+	R, S, V, err = UnsafeSigner{}.SignatureValues(sig)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -96,7 +104,7 @@ func (s ProductionSigner) SignatureValues(sig []byte) (R, S, V *big.Int, err err
 
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (s ProductionSigner) Hash(h Hasher) common.Hash {
+func (s ProductionSigner) Hash(h Hasher) Hash {
 	return h.HashWithData(s.chainID, uint(0), uint(0))
 }
 
@@ -130,11 +138,11 @@ func (s UnsafeSigner) Hash(h Hasher) Hash {
 
 func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (Address, error) {
 	if Vb.BitLen() > 8 {
-		return Address{}, ErrInvalidSig
+		return Address{}, errInvalidSig
 	}
 	V := byte(Vb.Uint64() - 27)
 	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
-		return Address{}, ErrInvalidSig
+		return Address{}, errInvalidSig
 	}
 	// encode the snature in uncompressed format
 	r, s := R.Bytes(), S.Bytes()
@@ -166,4 +174,92 @@ func deriveChainID(v *big.Int) *big.Int {
 	}
 	v = new(big.Int).Sub(v, big.NewInt(35))
 	return v.Div(v, big.NewInt(2))
+}
+
+// SignTx signs the transaction using the given signer and private key
+func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
+	h := signer.Hash(tx)
+	sig, err := crypto.Sign(h.Bytes(), prv)
+	if err != nil {
+		return nil, err
+	}
+	return tx.WithSignature(signer, sig)
+}
+
+// SignProposal signs the proposal using the given signer and private key
+func SignProposal(proposal *Proposal, signer Signer, prv *ecdsa.PrivateKey) (*Proposal, error) {
+	h := signer.Hash(proposal)
+	sig, err := crypto.Sign(h[:], prv)
+	if err != nil {
+		return nil, err
+	}
+	return proposal.WithSignature(signer, sig)
+
+}
+
+// SignVote signs the vote using the given signer and private key
+func SignVote(vote *Vote, signer Signer, prv *ecdsa.PrivateKey) (*Vote, error) {
+	h := signer.Hash(vote)
+	sig, err := crypto.Sign(h[:], prv)
+	if err != nil {
+		return nil, err
+	}
+	return vote.WithSignature(signer, sig)
+}
+
+func TxSender(signer Signer, tx *Transaction) (Address, error) {
+	if sc := tx.from.Load(); sc != nil {
+		sigCache := sc.(sigCache)
+		// If the signer used to derive from in a previous
+		// call is not the same as used current, invalidate
+		// the cache.
+		if sigCache.signer.Equal(signer) {
+			return sigCache.from, nil
+		}
+	}
+
+	addr, err := signer.Sender(tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	tx.from.Store(sigCache{signer: signer, from: addr})
+	return addr, nil
+}
+
+func ProposalSender(signer Signer, proposal *Proposal) (Address, error) {
+	if sc := proposal.from.Load(); sc != nil {
+		sigCache := sc.(sigCache)
+		// If the signer used to derive from in a previous
+		// call is not the same as used current, invalidate
+		// the cache.
+		if sigCache.signer.Equal(signer) {
+			return sigCache.from, nil
+		}
+	}
+
+	addr, err := signer.Sender(proposal)
+	if err != nil {
+		return common.Address{}, err
+	}
+	proposal.from.Store(sigCache{signer: signer, from: addr})
+	return addr, nil
+}
+
+func VoteSender(signer Signer, vote *Vote) (Address, error) {
+	if sc := vote.from.Load(); sc != nil {
+		sigCache := sc.(sigCache)
+		// If the signer used to derive from in a previous
+		// call is not the same as used current, invalidate
+		// the cache.
+		if sigCache.signer.Equal(signer) {
+			return sigCache.from, nil
+		}
+	}
+
+	addr, err := signer.Sender(vote)
+	if err != nil {
+		return common.Address{}, err
+	}
+	vote.from.Store(sigCache{signer: signer, from: addr})
+	return addr, nil
 }

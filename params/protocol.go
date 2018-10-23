@@ -15,18 +15,23 @@
 package params
 
 const (
-	// MaxTransactionsPerBlock refers to the maximum transactions supported by the consensus protocol per block.
+	// MaxTransactionsPerBlock refers to the maximum transactions supported
+	// by the consensus protocol per block.
 	MaxTransactionsPerBlock = 1000
 
 	// OracleReportInterval represents the time interval (in blocks) between reports.
 	OracleReportInterval = 900
 
-	// OracleReportSubmissionPeriod represents the period of time available (in blocks) for the report submission.
+	// OracleReportSubmissionPeriod represents the period of time available
+	// (in blocks) for the report submission.
 	OracleReportSubmissionPeriod = 15
 
-	// StabilityFeeIncreasePercentage
-	StabilityFeeIncreasePercentage = 2
+	// StabilityFeeIncrease we will periodically increase the
+	// stability fee by the “tolerably small amount” of 9% until it rises
+	// to its maximum value (StabilityFeeMax).
+	StabilityFeeIncrease = 9
 
-	// StabilityFeeTxPercentage
-	StabilityFeeTxPercentage = 2
+	// StabilityFeeMax represents the maximum value
+	// of the stability fee (2 % of the transaction amount)
+	StabilityFeeMax = 2
 )

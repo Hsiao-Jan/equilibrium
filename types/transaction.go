@@ -15,22 +15,26 @@
 package types
 
 import (
+	"fmt"
 	"io"
 	"math/big"
 	"sync/atomic"
 
+	"github.com/kowala-tech/equilibrium/params"
+
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/stabilization"
 )
 
-//go:generate gencodec -type txData -field-override txDataMarshaling -out gen_tx_json.go
+//go:generate gencodec -type txData -field-override txDataMarshaling -out gen_transaction_json.go
 
 type txData struct {
 	AccountNonce uint64   `json:"accountNonce" gencodec:"required"`
 	ComputeLimit uint64   `json:"computeLimit" gencodec:"required"`
-	to           *Address `json:"to"           rlp:"nil"` // nil means contract creation
+	Recipient    *Address `json:"recipient"           rlp:"nil"` // nil means contract creation
 	Amount       *big.Int `json:"amount"       gencodec:"required"`
 	Payload      []byte   `json:"payload"      gencodec:"required"`
 
@@ -63,22 +67,22 @@ type Transaction struct {
 	from atomic.Value
 }
 
-func NewTransaction(nonce uint64, to Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
-	return newTransaction(nonce, &to, amount, computeLimit, payload)
+func NewTransaction(nonce uint64, recipient Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+	return newTransaction(nonce, &recipient, amount, computeLimit, payload)
 }
 
 func NewContractCreation(nonce uint64, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	return newTransaction(nonce, nil, amount, computeLimit, payload)
 }
 
-func newTransaction(nonce uint64, to *Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+func newTransaction(nonce uint64, recipient *Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	if len(payload) > 0 {
 		payload = common.CopyBytes(payload)
 	}
 
 	data := txData{
 		AccountNonce: nonce,
-		To:     to,
+		Recipient:    recipient,
 		Payload:      payload,
 		Amount:       new(big.Int),
 		ComputeLimit: computeLimit,
@@ -101,10 +105,10 @@ func (tx *Transaction) Nonce() uint64        { return tx.data.AccountNonce }
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.
 func (tx *Transaction) To() *Address {
-	if tx.data.To == nil {
+	if tx.data.Recipient == nil {
 		return nil
 	}
-	to := *tx.data.To
+	to := *tx.data.Recipient
 	return &to
 }
 
@@ -144,7 +148,7 @@ func (tx *Transaction) StabilityFee(stabilizationLevel uint64) *big.Int {
 
 // ComputeFee returns the transaction's compute fee (max compute fee for contract calls).
 func (tx *Transaction) ComputeFee() *big.Int {
-	return new(big.Int).Mul(tx.data.Price, new(big.Int).SetUint64(tx.data.ComputeLimit))
+	return new(big.Int).Mul(params.ComputeUnitPrice, new(big.Int).SetUint64(tx.data.ComputeLimit))
 }
 
 // Cost returns the transaction cost for a specific stabilization level.
@@ -189,11 +193,11 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON decodes the RPC transaction format.
 func (tx *Transaction) UnmarshalJSON(input []byte) error {
-	var data txdata
+	var data txData
 	if err := data.UnmarshalJSON(input); err != nil {
 		return err
 	}
-	
+
 	withSignature := data.V.Sign() != 0 || data.R.Sign() != 0 || data.S.Sign() != 0
 	if withSignature {
 		var V byte
@@ -204,7 +208,7 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 			V = byte(data.V.Uint64() - 27)
 		}
 		if !crypto.ValidateSignatureValues(V, data.R, data.S, false) {
-			return ErrInvalidSig
+			return errInvalidSig
 		}
 	}
 
@@ -213,11 +217,11 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 }
 
 func (tx *Transaction) String() string {
-	var from, to string
+	var from, recipient string
 	if tx.data.V != nil {
 		// make a best guess about the signer and use that to derive
 		// the sender.
-		signer := deriveSigner(tx.data.V)
+		signer := NewProductionSigner(deriveChainID(tx.data.V))
 		if f, err := TxSender(signer, tx); err != nil { // derive but don't cache
 			from = "[invalid sender: invalid sig] " + err.Error()
 		} else {
@@ -227,17 +231,17 @@ func (tx *Transaction) String() string {
 		from = "[invalid sender: nil V field]"
 	}
 
-	if tx.data.To == nil {
-		to = "[contract creation]"
+	if tx.data.Recipient == nil {
+		recipient = "[contract creation]"
 	} else {
-		to = fmt.Sprintf("%x", tx.data.To[:])
+		recipient = fmt.Sprintf("%x", tx.data.Recipient[:])
 	}
 	enc, _ := rlp.EncodeToBytes(&tx.data)
 	return fmt.Sprintf(`
 	TX(%x)
 	Contract Creation:      %v
 	From:                   %s
-	To:                     %s
+	Recipient:              %s
 	Nonce:                  %v
 	ComputeLimit:           %v
 	Amount:                 %#x
@@ -248,9 +252,9 @@ func (tx *Transaction) String() string {
 	Hex:                    %x
 `,
 		tx.Hash(),
-		tx.data.To == nil,
+		tx.data.Recipient == nil,
 		from,
-		to,
+		recipient,
 		tx.data.AccountNonce,
 		tx.data.ComputeLimit,
 		tx.data.Amount,
@@ -293,4 +297,13 @@ func TxDifference(a, b Transactions) (keep Transactions) {
 	}
 
 	return keep
+}
+
+func isProtectedV(V *big.Int) bool {
+	if V.BitLen() <= 8 {
+		v := V.Uint64()
+		return v != 27 && v != 28
+	}
+	// anything not 27 or 28 are considered unprotected
+	return true
 }

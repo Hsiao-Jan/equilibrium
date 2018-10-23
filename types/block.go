@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"reflect"
 	"sort"
 	"sync/atomic"
 	"unsafe"
@@ -26,6 +25,10 @@ import (
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/kcoin/client/consensus"
+	"github.com/kowala-tech/kcoin/client/core/state"
+	"github.com/kowala-tech/kcoin/client/core/types"
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -35,24 +38,24 @@ var (
 	EmptyHash     = rlpHash(nil)
 )
 
-// Header represents a block header in the Kowala blockchain.
+// Header represents a block header.
 type Header struct {
 	// basic info
-	Number     *big.Int `json:"number"    gencodec:"required"`
-	ParentHash Hash     `json:"parentHash"     gencodec:"required"`
-	Extra      []byte   `json:"extraData" gencodec:"required"`
+	Number            *big.Int `json:"number"            gencodec:"required"`
+	PreviousBlockHash Hash     `json:"previousBlockHash" gencodec:"required"`
+	Extra             []byte   `json:"extraData"         gencodec:"required"`
 
 	// consensus
-	Time                  *big.Int `json:"timestamp"      gencodec:"required"`
-	Proposer              Address  `json:"proposer"       gencodec:"required"`
-	LastCommitHash        Hash     `json:"lastCommitRoot" gencodec:"required"`
-	ProtocolViolationHash Hash     `json:"violationsHash" gencodec:"required"`
-	Root                  Hash     `json:"stateRoot"      gencodec:"required"`
+	Snapshot Hash     `json:"stateRoot" gencodec:"required"` // state of the system at a particular point in time.
+	Time     *big.Int `json:"timestamp" gencodec:"required"` // time is used to sync the validators upon a new consensus round.
+	Proposer Address  `json:"proposer"  gencodec:"required"`
 
 	// block data
-	TxHash      Hash  `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash Hash  `json:"receiptHash"      gencodec:"required"`
-	Bloom       Bloom `json:"logsBloom"        gencodec:"required"`
+	LastCommitHash        Hash  `json:"lastCommitRoot" gencodec:"required"`
+	ProtocolViolationHash Hash  `json:"violationsHash" gencodec:"required"`
+	TxHash                Hash  `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash           Hash  `json:"receiptHash"      gencodec:"required"`
+	Bloom                 Bloom `json:"logsBloom"        gencodec:"required"`
 }
 
 // headerMarshaling field type overrides for gencodec
@@ -209,11 +212,20 @@ func (b *Block) WithBody(txs []*Transaction, lastCommit *Commit, protocolViolati
 	return block
 }
 
-func (b *Block) Header() *Header                 { return CopyHeader(b.header) }
-func (b *Block) Transactions() Transactions      { return b.transactions }
-func (b *Block) LastCommit() *Commit             { return CopyCommit(b.lastCommit) }
+// Header returns a deep copy of the block header.
+func (b *Block) Header() *Header { return CopyHeader(b.header) }
+
+// Transactions returns the block's transactions.
+func (b *Block) Transactions() Transactions { return b.transactions }
+
+// LastCommit returns the list of pre-commits for the previous block.
+func (b *Block) LastCommit() *Commit { return CopyCommit(b.lastCommit) }
+
+// ProtocolViolations returns the list of convictions.
 func (b *Block) ProtocolViolations() Convictions { return b.protocolViolations }
 
+// Transaction returns a transaction for a given hash if the transaction
+// is present in the block.
 func (b *Block) Transaction(hash Hash) *Transaction {
 	for _, transaction := range b.transactions {
 		if transaction.Hash() == hash {
@@ -223,22 +235,41 @@ func (b *Block) Transaction(hash Hash) *Transaction {
 	return nil
 }
 
-func (b *Block) Number() *big.Int  { return new(big.Int).Set(b.header.Number) }
-func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
-func (b *Block) ParentHash() Hash  { return b.header.ParentHash }
-func (b *Block) Extra() []byte     { return common.CopyBytes(b.header.Extra) }
+// Number returns the block number.
+func (b *Block) Number() *big.Int { return new(big.Int).Set(b.header.Number) }
 
-func (b *Block) Time() *big.Int              { return new(big.Int).Set(b.header.Time) }
-func (b *Block) Proposer() Address           { return b.header.Proposer }
+// NumberU64 returns the block number as uint64.
+func (b *Block) NumberU64() uint64 { return b.header.Number.Uint64() }
+
+// PreviousBlockHash returns the block hash of the previous chain block.
+func (b *Block) PreviousBlockHash() Hash { return b.header.PreviousBlockHash }
+
+// Extra returns extra information present in the block.
+func (b *Block) Extra() []byte { return common.CopyBytes(b.header.Extra) }
+
+// Time returns
+func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
+
+// Proposer returns the validator responsible for proposing the block.
+func (b *Block) Proposer() Address { return b.header.Proposer }
+
+//
 func (b *Block) LastCommitHash() Hash        { return b.header.LastCommitHash }
 func (b *Block) ProtocolViolationHash() Hash { return b.header.ProtocolViolationHash }
-func (b *Block) Root() Hash                  { return b.header.Root }
 
-func (b *Block) Bloom() Bloom      { return b.header.Bloom }
-func (b *Block) TxHash() Hash      { return b.header.TxHash }
+// Snapshot returns the block's state root.
+func (b *Block) Snapshot() Hash { return b.header.Snapshot }
+
+func (b *Block) Bloom() Bloom { return b.header.Bloom }
+
+// TxHash returns the transactions' trie root.
+func (b *Block) TxHash() Hash { return b.header.TxHash }
+
+// ReceiptHash returns the receipts' trie root.
 func (b *Block) ReceiptHash() Hash { return b.header.ReceiptHash }
 
-// "external" block encoding. used for kcoin protocol, etc.
+// @TODO (rgeraldes) - when are we using it
+// "external" block encoding. .
 type extblock struct {
 	Header             *Header
 	Transactions       []*Transaction
@@ -309,86 +340,69 @@ func CopyCommit(commit *Commit) *Commit {
 	return &cpy
 }
 
-// Evidence is the information that is used to decide the case.
-type Evidence interface {
-	Summary() Hash
-	FactFinder() Address
+// BlockValidator is responsible for validating block headers and
+// processed state.
+//
+// BlockValidator implements Validator.
+type BlockValidator struct {
+	config *params.ChainConfig // Chain configuration options
+	bc     *BlockChain         // Canonical block chain
+	engine consensus.Engine    // Consensus engine used for validating
 }
 
-// Conviction is the verdict that usually results when a validator
-// finds other validator guilty of protocol violation.
-type Conviction struct {
-	blockNumber *big.Int `json:"blockNumber" gencodec:"required"`
-	perpetrator Address  `json:"perpetrator" gencodec:"required"`
-	evidence    Evidence `json:"evidence"    gencodec:"required"`
-}
-
-// Category returns the conviction category.
-func (c *Conviction) Category() string {
-	return reflect.TypeOf(c.evidence).Name()
-}
-
-// Convictions is a Conviction slice type for basic sorting.
-type Convictions []*Conviction
-
-// Len returns the length of s.
-func (c Convictions) Len() int { return len(c) }
-
-// Swap swaps the i'th and the j'th element in s.
-func (c Convictions) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
-
-// GetRlp implements Rlpable and returns the i'th element of s in rlp.
-func (c Convictions) GetRlp(i int) []byte {
-	enc, _ := rlp.EncodeToBytes(c[i])
-	return enc
-}
-
-var _ Evidence = (*DuplicateVoting)(nil)
-
-// DuplicateVoting satisfies the Evidence interface.
-type DuplicateVoting struct {
-	Vote1 *Vote `json:"vote1" gencodec:"required"`
-	Vote2 *Vote `json:"vote2" gencodec:"required"`
-
-	V *big.Int `json:"v" gencodec:"required"`
-	R *big.Int `json:"r" gencodec:"required"`
-	S *big.Int `json:"s" gencodec:"required"`
-}
-
-// Summary returns DuplicateVoting Hash.
-func (dv *DuplicateVoting) Summary() Hash {
-	return rlpHash(dv)
-}
-
-// FactFinder returns the validator responsible for gathering the facts.
-func (dv *DuplicateVoting) FactFinder() Address {
-	// @TODO (rgeraldes) - returns the validator addr based on the signature
-	return Address{}
-}
-
-// StorageSize is a wrapper around a float value that supports user friendly
-// formatting.
-type StorageSize float64
-
-// String implements the stringer interface.
-func (s StorageSize) String() string {
-	if s > 1000000 {
-		return fmt.Sprintf("%.2f mB", s/1000000)
-	} else if s > 1000 {
-		return fmt.Sprintf("%.2f kB", s/1000)
-	} else {
-		return fmt.Sprintf("%.2f B", s)
+// NewBlockValidator returns a new block validator which is safe for re-use
+func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engine consensus.Engine) *BlockValidator {
+	validator := &BlockValidator{
+		config: config,
+		engine: engine,
+		bc:     blockchain,
 	}
+	return validator
 }
 
-// TerminalString implements log.TerminalStringer, formatting a string for console
-// output during logging.
-func (s StorageSize) TerminalString() string {
-	if s > 1000000 {
-		return fmt.Sprintf("%.2fmB", s/1000000)
-	} else if s > 1000 {
-		return fmt.Sprintf("%.2fkB", s/1000)
-	} else {
-		return fmt.Sprintf("%.2fB", s)
+// ValidateBody validates the given block's uncles and verifies the the block
+// header's transaction and uncle roots. The headers are assumed to be already
+// validated at this point.
+func (v *BlockValidator) ValidateBody(block *types.Block) error {
+	// Check whether the block's known, and if not, that it's linkable
+	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
+		return ErrKnownBlock
 	}
+	if !v.bc.HasBlockAndState(block.PreviousBlockHash(), block.NumberU64()-1) {
+		if !v.bc.HasBlock(block.PreviousBlockHash(), block.NumberU64()-1) {
+			return consensus.ErrUnknownAncestor
+		}
+		return consensus.ErrPrunedAncestor
+	}
+	// Header validity is known at this point, check transactions
+	header := block.Header()
+
+	// @TODO (rgeraldes) - add commit verification + hash
+
+	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
+		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
+	}
+	return nil
+}
+
+// ValidateState validates the various changes that happen after a state
+// transition, the receipt roots and the state root itself.
+func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.StateDB, receipts types.Receipts) error {
+	// Validate the received block's bloom with the one derived from the generated receipts.
+	// For valid blocks this should always validate to true.
+	rbloom := types.CreateBloom(receipts)
+	if rbloom != header.Bloom {
+		return fmt.Errorf("invalid bloom (remote: %x  local: %x)", header.Bloom, rbloom)
+	}
+	// Tre receipt Trie's root (R = (Tr [[H1, R1], ... [Hn, R1]]))
+	receiptSha := types.DeriveSha(receipts)
+	if receiptSha != header.ReceiptHash {
+		return fmt.Errorf("invalid receipt root hash (remote: %x local: %x)", header.ReceiptHash, receiptSha)
+	}
+	// Validate the local snapshot against the received snapshot and throw
+	// an error if they don't match.
+	if snapshot := statedb.IntermediateRoot(true); header.Snapshot != snapshot {
+		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Snapshot, snapshot)
+	}
+	return nil
 }

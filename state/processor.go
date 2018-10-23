@@ -1,4 +1,4 @@
-package core
+package state
 
 import (
 	"github.com/davecgh/go-spew/spew"

@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	increase     = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityFeeIncreasePercentage))
-	TxPercentage = new(big.Int).SetUint64(params.StabilityFeeTxPercentage)
+	increase        = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityFeeIncrease))
+	maxTxPercentage = new(big.Int).SetUint64(params.StabilityFeeMax)
 )
 
 // Fee returns the stability fee for a specific a compute fee, stabilization level and transaction amount.
@@ -38,12 +38,10 @@ func Fee(computeFee *big.Int, stabilizationLevel uint64, txAmount *big.Int) *big
 
 	// fee = compute fee  * 1.09^r(b)
 	lvl := new(big.Int).SetUint64(stabilizationLevel)
-	mul := new(big.Int).Exp(stabilityIncrease, lvl, nil)
+	mul := new(big.Int).Exp(increase, lvl, nil)
 	div := new(big.Int).Exp(common.Big100, lvl, nil)
-	fee := new(big.Int).Div(new(big.Int).Mul(computeFee, mul), div)
+	currentFee := new(big.Int).Div(new(big.Int).Mul(computeFee, mul), div)
+	maxFee := new(big.Int).Div(new(big.Int).Mul(txAmount, maxTxPercentage), common.Big100)
 
-	// percentage of tx amount
-	maxFee := new(big.Int).Div(new(big.Int).Mul(txAmount, stabilityTxPercentage), common.Big100)
-
-	return common.Min(fee, maxFee)
+	return common.Min(currentFee, maxFee)
 }
