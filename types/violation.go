@@ -6,7 +6,6 @@ import (
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
-	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
 var _ Evidence = (*DuplicateVoting)(nil)
@@ -14,7 +13,7 @@ var _ Evidence = (*DuplicateVoting)(nil)
 // Evidence is the information that is used to decide the case.
 type Evidence interface {
 	Hash() Hash
-	FactFinder() (Address, error)
+	FactFinder(signer Signer) (Address, error)
 }
 
 // Conviction is the verdict that results when a validator
@@ -31,24 +30,13 @@ type convictionMarshaling struct {
 }
 
 // Category returns the conviction category.
-func (c *Conviction) Category() string {
-	return reflect.TypeOf(c.evidence).Name()
-}
+func (c *Conviction) Category() string { return reflect.TypeOf(c.evidence).Name() }
 
-// Convictions is a Conviction slice type for basic sorting.
-type Convictions []*Conviction
+// Perpetrator returns the conviction perpetrator.
+func (c *Conviction) Perpetrator() string { return c.perpetrator }
 
-// Len returns the length of s.
-func (c Convictions) Len() int { return len(c) }
-
-// Swap swaps the i'th and the j'th element in s.
-func (c Convictions) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
-
-// GetRlp implements Rlpable and returns the i'th element of s in rlp.
-func (c Convictions) GetRlp(i int) []byte {
-	enc, _ := rlp.EncodeToBytes(c[i])
-	return enc
-}
+// Evidence returns the conviction evidence.
+func (c *Conviction) Evidence() Evidence { return c.evidence }
 
 // DuplicateVoting satisfies the Evidence interface.
 type DuplicateVoting struct {

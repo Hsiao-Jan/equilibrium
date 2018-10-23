@@ -1056,14 +1056,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, logs, requiredEffort, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			log.Debug("insert chain error while bc.processor.Process of a block", "err", err.Error())
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(block, parent, state, receipts, usedGas)
+		err = bc.Validator().ValidateState(block, parent, state, receipts, requiredEffort)
 		if err != nil {
 			log.Debug("insert chain error while bc.Validator().ValidateState of a block", "data", spew.Sdump(
 				block.ReceivedFrom,
@@ -1078,7 +1078,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				parent.Header().TxHash,
 				parent.Header().ParentHash,
 				parent.Header().Root,
-				usedGas))
+				requiredEffort))
 
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1093,7 +1093,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		switch status {
 		case CanonStatTy:
 			log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
-				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
+				"txs", len(block.Transactions()), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			coalescedLogs = append(coalescedLogs, logs...)
 			blockInsertTimer.UpdateSince(bstart)

@@ -32,10 +32,13 @@ import (
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
+//go:generate gencodec -type Commit -out gen_commit_json.go
 
 var (
+	// EmptyRootHash represents a trie hash for an empty slice of transactions.
 	EmptyRootHash = deriveSha(Transactions{})
-	EmptyHash     = rlpHash(nil)
+	// EmptyHash represents the rlp hash for nil.
+	EmptyHash = rlpHash(nil)
 )
 
 // Header represents a block header.
@@ -51,8 +54,8 @@ type Header struct {
 	Proposer Address  `json:"proposer"  gencodec:"required"`
 
 	// block data
-	LastCommitHash        Hash  `json:"lastCommitRoot" gencodec:"required"`
-	ProtocolViolationHash Hash  `json:"violationsHash" gencodec:"required"`
+	LastCommitHash        Hash  `json:"lastCommitRoot"  gencodec:"required"`
+	ProtocolViolationHash Hash  `json:"violationsHash"  gencodec:"required"`
 	TxHash                Hash  `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash           Hash  `json:"receiptHash"      gencodec:"required"`
 	Bloom                 Bloom `json:"logsBloom"        gencodec:"required"`
@@ -99,7 +102,7 @@ func CopyHeader(h *Header) *Header {
 type Block struct {
 	header             *Header
 	lastCommit         *Commit
-	protocolViolations Convictions
+	protocolViolations []*Conviction
 	transactions       Transactions
 
 	// caches
@@ -109,7 +112,7 @@ type Block struct {
 
 // NewBlock creates a new block. The values of TxHash, ReceiptHash and Bloom in header
 // are ignored and set to values derived from the given txs and receipts.
-func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, lastCommit *Commit, violations Convictions) (*Block, error) {
+func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, lastCommit *Commit, violations []*Conviction) (*Block, error) {
 	if len(txs) != len(receipts) {
 		return nil, fmt.Errorf("Number of transactions (%d) does not match number of receipts (%d)", len(txs), len(receipts))
 	}
@@ -132,16 +135,15 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, lastCommi
 	}
 
 	if lastCommit != nil {
-		// @TODO
-		//block.header.LastCommitHash = deriveSha()
+		block.header.LastCommitHash = rlpHash(lastCommit)
 		block.lastCommit = CopyCommit(lastCommit)
 	}
 
 	if len(violations) == 0 {
 		block.header.ProtocolViolationHash = EmptyHash
 	} else {
-		block.header.ProtocolViolationHash = deriveSha(Convictions(violations))
-		block.protocolViolations = make(Convictions, len(violations))
+		block.header.ProtocolViolationHash = rlpHash(violations)
+		block.protocolViolations = make([]*Conviction, len(violations))
 		copy(block.protocolViolations, violations)
 	}
 
@@ -222,7 +224,7 @@ func (b *Block) Transactions() Transactions { return b.transactions }
 func (b *Block) LastCommit() *Commit { return CopyCommit(b.lastCommit) }
 
 // ProtocolViolations returns the list of convictions.
-func (b *Block) ProtocolViolations() Convictions { return b.protocolViolations }
+func (b *Block) ProtocolViolations() []*Conviction { return b.protocolViolations }
 
 // Transaction returns a transaction for a given hash if the transaction
 // is present in the block.
@@ -253,13 +255,16 @@ func (b *Block) Time() *big.Int { return new(big.Int).Set(b.header.Time) }
 // Proposer returns the validator responsible for proposing the block.
 func (b *Block) Proposer() Address { return b.header.Proposer }
 
-//
-func (b *Block) LastCommitHash() Hash        { return b.header.LastCommitHash }
+// LastCommitHash returns the hash of the +2/3 precommit signatures for the previous block.
+func (b *Block) LastCommitHash() Hash { return b.header.LastCommitHash }
+
+// ProtocolViolationHash returns the hash of the protocol violations.
 func (b *Block) ProtocolViolationHash() Hash { return b.header.ProtocolViolationHash }
 
 // Snapshot returns the block's state root.
 func (b *Block) Snapshot() Hash { return b.header.Snapshot }
 
+// Bloom returns the logs bloom filter.
 func (b *Block) Bloom() Bloom { return b.header.Bloom }
 
 // TxHash returns the transactions' trie root.
@@ -268,8 +273,7 @@ func (b *Block) TxHash() Hash { return b.header.TxHash }
 // ReceiptHash returns the receipts' trie root.
 func (b *Block) ReceiptHash() Hash { return b.header.ReceiptHash }
 
-// @TODO (rgeraldes) - when are we using it
-// "external" block encoding. .
+// "external" block encoding.
 type extblock struct {
 	Header             *Header
 	Transactions       []*Transaction
@@ -299,14 +303,15 @@ func (b *Block) EncodeRLP(w io.Writer) error {
 	})
 }
 
+// Blocks is a block slice type for sorting.
 type Blocks []*Block
 
 type BlockBy func(b1, b2 *Block) bool
 
-func (self BlockBy) Sort(blocks Blocks) {
+func (bb BlockBy) Sort(blocks Blocks) {
 	bs := blockSorter{
 		blocks: blocks,
-		by:     self,
+		by:     bb,
 	}
 	sort.Sort(bs)
 }
@@ -316,19 +321,23 @@ type blockSorter struct {
 	by     func(b1, b2 *Block) bool
 }
 
-func (self blockSorter) Len() int { return len(self.blocks) }
-func (self blockSorter) Swap(i, j int) {
-	self.blocks[i], self.blocks[j] = self.blocks[j], self.blocks[i]
-}
-func (self blockSorter) Less(i, j int) bool { return self.by(self.blocks[i], self.blocks[j]) }
+// Len returns the length of s.
+func (bs blockSorter) Len() int { return len(bs.blocks) }
 
-func Number(b1, b2 *Block) bool { return b1.header.Number.Cmp(b2.header.Number) < 0 }
+// Swap swaps the i'th and the j'th element in bs.
+func (bs blockSorter) Swap(i, j int) {
+	bs.blocks[i], bs.blocks[j] = bs.blocks[j], bs.blocks[i]
+}
+
+// Less verifies if the i'th block comes before the j'th block.
+func (bs blockSorter) Less(i, j int) bool { return bs.by(self.blocks[i], bs.blocks[j]) }
 
 // Commit contains the evidence that the block was committed by a set of validators.
 type Commit struct {
 	preCommits Votes `json:"preCommits" gencodec:"required"`
 }
 
+// PreCommits returns the validators' pre commits.
 func (c *Commit) PreCommits() Votes { return c.preCommits }
 
 // CopyCommit creates a deep copy of the commit info to prevent side effects from
@@ -341,9 +350,7 @@ func CopyCommit(commit *Commit) *Commit {
 }
 
 // BlockValidator is responsible for validating block headers and
-// processed state.
-//
-// BlockValidator implements Validator.
+// processed state. BlockValidator implements Validator.
 type BlockValidator struct {
 	config *params.ChainConfig // Chain configuration options
 	bc     *BlockChain         // Canonical block chain
@@ -377,7 +384,13 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	// Header validity is known at this point, check transactions
 	header := block.Header()
 
-	// @TODO (rgeraldes) - add commit verification + hash
+	if hash := rlpHash(block.LastCommit()); hash != header.LastCommitHash {
+		return fmt.Errorf("last commit root hash mismatch: have %x, want %x", hash, header.LastCommitHash)
+	}
+
+	if hash := rlpHash(block.ProtocolViolations()); hash != header.ProtocolViolationHash {
+		return fmt.Errorf("protocol violation root hash mismatch: have %x, want %x", hash, header.ProtocolViolationHash)
+	}
 
 	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)

@@ -31,7 +31,7 @@ type BitArray struct {
 	bits   []uint64
 }
 
-// NewBitArray returns a new BitArray
+// NewBitArray returns a new BitArray.
 func NewBitArray(nbits uint64) *BitArray {
 	if nbits == 0 {
 		return nil
@@ -42,7 +42,7 @@ func NewBitArray(nbits uint64) *BitArray {
 	}
 }
 
-// Set sets the given bit value to 1.
+// Set sets the given bit to 1.
 func (array *BitArray) Set(i int) {
 	array.bitsMu.Lock()
 	defer array.bitsMu.Unlock()
@@ -56,7 +56,7 @@ func (array *BitArray) Get(i int) bool {
 	return array.bits[i>>div] & (uint64(1) << (i & mod))
 }
 
-// Size returns the number of bits in the array.
+// Size returns the number of bits in the bit array.
 func (array *BitArray) Size() int { return array.nbits }
 
 /*
