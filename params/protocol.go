@@ -15,23 +15,38 @@
 package params
 
 const (
-	// MaxTransactionsPerBlock refers to the maximum transactions supported
-	// by the consensus protocol per block.
-	MaxTransactionsPerBlock = 1000
+	// MaxTransactionsPerBlock refers to the maximum transactions supported by the
+	// consensus protocol per block.
+	MaxTransactionsPerBlock uint64 = 1000
 
-	// OracleReportInterval represents the time interval (in blocks) between reports.
-	OracleReportInterval = 900
+	// OracleReportInterval represents the time interval (in blocks) between
+	// reports.
+	OracleReportInterval uint64 = 900
 
-	// OracleReportSubmissionPeriod represents the period of time available
-	// (in blocks) for the report submission.
-	OracleReportSubmissionPeriod = 15
+	// OracleReportSubmissionPeriod represents the period of time available (in
+	// blocks) for the report submission.
+	OracleReportSubmissionPeriod uint64 = 15
 
-	// StabilityFeeIncrease we will periodically increase the
-	// stability fee by the “tolerably small amount” of 9% until it rises
-	// to its maximum value (StabilityFeeMax).
-	StabilityFeeIncrease = 9
+	// StabilityFeeIncreasePercentage we will periodically increase the stability fee
+	// by the “tolerably small amount” of 9% until it rises to its maximum value
+	// (StabilityFeeMax).
+	StabilityFeeIncreasePercentage uint64 = 9
 
-	// StabilityFeeMax represents the maximum value
-	// of the stability fee (2 % of the transaction amount)
-	StabilityFeeMax = 2
+	// StabilityFeeMaxPercentage represents the tx amount percentage that corresponds
+	// to the max stability fee. According to the whitepaper, the maximum stability
+	// fee is now 2% of the transaction amount.
+	StabilityFeeMaxPercentage uint64 = 2
+
+	// BlockTime (ms) refers to the maximum time that it takes to mine a block.
+	BlockTime uint64 = 3000
+
+	// WARNING: the following values (ms) must make sense give the block time.
+	/*
+		ProposeDuration        uint64 = 1000
+		ProposeDeltaDuration   uint64 = 50
+		PreVoteDuration        uint64 = 900
+		PreVoteDeltaDuration   uint64 = 25
+		PreCommitDuration      uint64 = 900
+		PreCommitDeltaDuration uint64 = 50
+	*/
 )
