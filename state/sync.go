@@ -14,22 +14,28 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package trie
+package state
 
 import (
-	"fmt"
+	"bytes"
 
-	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/kcoin/client/common"
+	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/kcoin/client/trie"
 )
 
-// MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)
-// in the case where a trie node is not present in the local database. It contains
-// information necessary for retrieving the missing node.
-type MissingNodeError struct {
-	NodeHash types.Hash // hash of the missing node
-	Path     []byte     // hex-encoded path to the missing node
-}
-
-func (err *MissingNodeError) Error() string {
-	return fmt.Sprintf("missing trie node %x (path %x)", err.NodeHash, err.Path)
+// NewStateSync create a new state trie download scheduler.
+func NewStateSync(root common.Hash, database trie.DatabaseReader) *trie.Sync {
+	var syncer *trie.Sync
+	callback := func(leaf []byte, parent common.Hash) error {
+		var obj Account
+		if err := rlp.Decode(bytes.NewReader(leaf), &obj); err != nil {
+			return err
+		}
+		syncer.AddSubTrie(obj.Root, 64, parent, nil)
+		syncer.AddRawEntry(common.BytesToHash(obj.CodeHash), 64, parent)
+		return nil
+	}
+	syncer = trie.NewSync(root, database, callback)
+	return syncer
 }

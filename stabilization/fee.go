@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	increase        = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityFeeIncrease))
-	maxTxPercentage = new(big.Int).SetUint64(params.StabilityFeeMax)
+	increase        = new(big.Int).Add(common.Big100, new(big.Int).SetUint64(params.StabilityFeeIncreasePercentage))
+	maxTxPercentage = new(big.Int).SetUint64(params.StabilityFeeMaxPercentage)
 )
 
 // Fee returns the stability fee for a specific a compute fee, stabilization level and transaction amount.

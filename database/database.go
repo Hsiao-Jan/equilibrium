@@ -69,9 +69,8 @@ func NewLDBDatabase(file string, cache int, handles int) (*LDBDatabase, error) {
 		return nil, err
 	}
 	return &LDBDatabase{
-		fn:  file,
-		db:  db,
-		log: logger,
+		fn: file,
+		db: db,
 	}, nil
 }
 
@@ -281,7 +280,7 @@ func (db *LDBDatabase) meter(refresh time.Duration) {
 			// any subsequent warnings will be withhold for 1 minute to don't overwhelm the user.
 			if int(db.writeDelayNMeter.Rate1()) > writeDelayNThreshold &&
 				time.Now().After(lastWriteDelayN.Add(writeDelayWarningThrottler)) {
-				db.log.Warn("Write delay number exceeds the threshold (200 per second) in the last minute")
+				log.Info("Write delay number exceeds the threshold (200 per second) in the last minute")
 				lastWriteDelayN = time.Now()
 			}
 		}
@@ -293,7 +292,7 @@ func (db *LDBDatabase) meter(refresh time.Duration) {
 			// any subsequent warnings will be withhold for 1 minute to don't overwhelm the user.
 			if int64(db.writeDelayMeter.Rate1()) > writeDelayThreshold.Nanoseconds() &&
 				time.Now().After(lastWriteDelay.Add(writeDelayWarningThrottler)) {
-				db.log.Warn("Write delay duration exceeds the threshold (35% of the time) in the last minute")
+				log.Info("Write delay duration exceeds the threshold (35% of the time) in the last minute")
 				lastWriteDelay = time.Now()
 			}
 		}
@@ -301,7 +300,7 @@ func (db *LDBDatabase) meter(refresh time.Duration) {
 		// warnings will be withheld for one minute not to overwhelm the user.
 		if paused && delayN-delaystats[0] == 0 && duration.Nanoseconds()-delaystats[1] == 0 &&
 			time.Now().After(lastWritePaused.Add(writeDelayWarningThrottler)) {
-			db.log.Warn("Database compacting, degraded performance")
+			log.Info("Database compacting, degraded performance")
 			lastWritePaused = time.Now()
 		}
 

@@ -25,12 +25,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/kowala-tech/equilibrium/accounts"
-	"github.com/kowala-tech/equilibrium/consensus"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/p2p"
-	"github.com/kowala-tech/kcoin/client/consensus"
 	"github.com/prometheus/prometheus/util/flock"
 	"go.uber.org/zap"
 )
@@ -78,9 +75,8 @@ type Node struct {
 	hostCfg p2p.Config
 	host    *p2p.Host
 
-	engine     consensus.Engine
-	eventMux   *event.TypeMux
-	accountMgr *accounts.Manager
+	eventMux *event.TypeMux
+	//accountMgr *accounts.Manager
 
 	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
 	services     map[reflect.Type]Service // Currently running services
@@ -115,17 +111,19 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 		return nil, errors.New(`Config.Name cannot end in ".ipc"`)
 	}
 
-	accountMgr, ephemeralKeystore, err := makeAccountManager(conf)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		accountMgr, ephemeralKeystore, err := makeAccountManager(conf)
+		if err != nil {
+			return nil, err
+		}
+	*/
 
 	return &Node{
 		cfg:          cfg,
 		serviceFuncs: []ServiceConstructor{},
-		engine:       konsensus.New(),
-		eventMux:     new(event.TypeMux),
-		accountMgr:   accountMgr,
+		//engine:       konsensus.New(),
+		eventMux: new(event.TypeMux),
+		//accountMgr: accountMgr,
 	}, nil
 }
 
@@ -167,11 +165,10 @@ func (n *Node) Start() error {
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service
 		ctx := &ServiceContext{
-			cfg:             n.cfg,
-			services:        make(map[reflect.Type]Service),
-			ConsensusEngine: n.engine,
-			AccountManager:  n.accountMgr,
-			EventMux:        n.eventMux,
+			cfg:      n.cfg,
+			services: make(map[reflect.Type]Service),
+			//AccountManager: n.accountMgr,
+			EventMux: n.eventMux,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s

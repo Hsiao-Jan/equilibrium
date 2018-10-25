@@ -19,7 +19,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/kowala-tech/core_contracts/consensus"
+	"github.com/kowala-tech/equilibrium/consensus"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/services/archive"
 	"github.com/kowala-tech/equilibrium/services/mining/validator"

@@ -22,7 +22,8 @@ import (
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/crypto"
-	"github.com/kowala-tech/kcoin/client/params"
+	miningtypes "github.com/kowala-tech/equilibrium/services/mining/types"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var (
@@ -34,7 +35,7 @@ var (
 // @TODO (rgeraldes) - review comments
 
 type Hasher interface {
-	HashWithData(data ...interface{}) Hash
+	HashWithData(data ...interface{}) types.Hash
 }
 
 type Sender interface {
@@ -47,18 +48,18 @@ type Sender interface {
 // Signer encapsulates the signature handling.
 type Signer interface {
 	// Sender returns the sender address of the transaction.
-	Sender(s Sender) (Address, error)
+	Sender(s Sender) (types.Address, error)
 	// SignatureValues returns the raw R, S, V values corresponding to the
 	// given signature.
 	SignatureValues(sig []byte) (r, s, v *big.Int, err error)
 	// Hash returns the hash to be signed.
-	Hash(h Hasher) Hash
+	Hash(h Hasher) types.Hash
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
 }
 
 // MakeSigner returns a Signer based on the given chain config and block number.
-func MakeSigner(cfg *params.ChainConfig, blockNumber *big.Int) Signer {
+func MakeSigner( /*cfg *params.ChainConfig, blockNumber *big.Int*/ ) Signer {
 	return NewProductionSigner(cfg.ChainID)
 }
 
@@ -87,7 +88,7 @@ func (s ProductionSigner) Equal(s2 Signer) bool {
 	return ok && andromeda.chainID.Cmp(s.chainID) == 0
 }
 
-func (s ProductionSigner) Sender(sn Sender) (Address, error) {
+func (s ProductionSigner) Sender(sn Sender) (types.Address, error) {
 	if !sn.Protected() {
 		return UnsafeSigner{}.Sender(sn)
 	}
@@ -118,7 +119,7 @@ func (s ProductionSigner) SignatureValues(sig []byte) (R, S, V *big.Int, err err
 
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (s ProductionSigner) Hash(h Hasher) Hash {
+func (s ProductionSigner) Hash(h Hasher) types.Hash {
 	return h.HashWithData(s.chainID, uint(0), uint(0))
 }
 
@@ -141,7 +142,7 @@ func (s UnsafeSigner) SignatureValues(sig []byte) (sr, ss, sv *big.Int, err erro
 	return
 }
 
-func (s UnsafeSigner) Sender(sn Sender) (Address, error) {
+func (s UnsafeSigner) Sender(sn Sender) (types.Address, error) {
 	snR, snS, snV := sn.SignatureValues()
 	return recoverPlain(s.Hash(sn), snR, snS, snV, true)
 }
@@ -150,7 +151,7 @@ func (s UnsafeSigner) Hash(h Hasher) Hash {
 	return h.HashWithData()
 }
 
-func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (Address, error) {
+func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (types.Address, error) {
 	if Vb.BitLen() > 8 {
 		return Address{}, errInvalidSig
 	}
@@ -178,7 +179,7 @@ func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (Address, err
 }
 
 // SignTx signs the transaction using the given signer and private key
-func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
+func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*types.Transaction, error) {
 	h := signer.Hash(tx)
 	sig, err := crypto.Sign(h.Bytes(), prv)
 	if err != nil {
@@ -188,7 +189,7 @@ func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*Transaction
 }
 
 // SignProposal signs the proposal using the given signer and private key
-func SignProposal(proposal *Proposal, signer Signer, prv *ecdsa.PrivateKey) (*Proposal, error) {
+func SignProposal(proposal *Proposal, signer Signer, prv *ecdsa.PrivateKey) (*miningtypes.Proposal, error) {
 	h := signer.Hash(proposal)
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
@@ -199,7 +200,7 @@ func SignProposal(proposal *Proposal, signer Signer, prv *ecdsa.PrivateKey) (*Pr
 }
 
 // SignVote signs the vote using the given signer and private key
-func SignVote(vote *Vote, signer Signer, prv *ecdsa.PrivateKey) (*Vote, error) {
+func SignVote(vote *Vote, signer Signer, prv *ecdsa.PrivateKey) (*miningtypes.Vote, error) {
 	h := signer.Hash(vote)
 	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
@@ -215,7 +216,7 @@ type sigCache struct {
 	from   Address
 }
 
-func TxSender(signer Signer, tx *Transaction) (Address, error) {
+func TxSender(signer Signer, tx *Transaction) (types.Address, error) {
 	if sc := tx.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -234,7 +235,7 @@ func TxSender(signer Signer, tx *Transaction) (Address, error) {
 	return addr, nil
 }
 
-func ProposalSender(signer Signer, proposal *Proposal) (Address, error) {
+func ProposalSender(signer Signer, proposal *Proposal) (types.Address, error) {
 	if sc := proposal.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -253,7 +254,7 @@ func ProposalSender(signer Signer, proposal *Proposal) (Address, error) {
 	return addr, nil
 }
 
-func VoteSender(signer Signer, vote *Vote) (Address, error) {
+func VoteSender(signer Signer, vote *Vote) (types.Address, error) {
 	if sc := vote.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous

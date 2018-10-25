@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"sync"
 
-	"go.uber.org/zap"
-
 	"github.com/kowala-tech/equilibrium/log"
 	libp2p_host "github.com/libp2p/go-libp2p-host"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"go.uber.org/zap"
 )
 
 func bootstrapConnect(ctx context.Context, ph libp2p_host.Host, peers []pstore.PeerInfo) error {

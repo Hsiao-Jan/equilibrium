@@ -1,17 +1,6 @@
 package node
 
-import (
-	"go.uber.org/zap"
-	"fmt"
-	"io/ioutil"
-	"os"
-
-	"github.com/kowala-tech/equilibrium/accounts"
-	"github.com/kowala-tech/equilibrium/accounts/keystore"
-	"github.com/kowala-tech/equilibrium/accounts/usbwallet"
-	"github.com/kowala-tech/equilibrium/log"
-)
-
+/*
 func makeAccountMgr(conf *Config) (*accounts.Manager, string, error) {
 	scryptN, scryptP, keydir, err := conf.AccountConfig()
 	var ephemeral string
@@ -47,3 +36,4 @@ func makeAccountMgr(conf *Config) (*accounts.Manager, string, error) {
 	}
 	return accounts.NewManager(backends...), ephemeral, nil
 }
+*/

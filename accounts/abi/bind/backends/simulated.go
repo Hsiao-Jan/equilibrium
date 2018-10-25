@@ -10,20 +10,19 @@ import (
 	"github.com/kowala-tech/equilibrium"
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/math"
-	"github.com/kowala-tech/equilibrium/core"
-	"github.com/kowala-tech/equilibrium/core/bloombits"
-	"github.com/kowala-tech/equilibrium/core/rawdb"
-	"github.com/kowala-tech/equilibrium/core/state"
-	"github.com/kowala-tech/equilibrium/core/vm"
+	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/event"
-	"github.com/kowala-tech/equilibrium/kcoindb"
-	"github.com/kowala-tech/equilibrium/knode/filters"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/params"
 	"github.com/kowala-tech/equilibrium/params/effort"
 	"github.com/kowala-tech/equilibrium/rpc"
+	"github.com/kowala-tech/equilibrium/services/archive/types/rawdb"
+	"github.com/kowala-tech/equilibrium/state"
 	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/equilibrium/types/bloombits"
+	"github.com/kowala-tech/equilibrium/vm"
 	"github.com/kowala-tech/kcoin/client/consensus/konsensus"
+	"github.com/kowala-tech/kcoin/client/core"
 )
 
 var errBlockNumberUnsupported = errors.New("SimulatedBackend cannot access blocks other than the latest block")
@@ -32,14 +31,14 @@ var errEffortEstimationFailed = errors.New("required computational effort exceed
 // SimulatedBackend implements bind.ContractBackend, simulating a blockchain in
 // the background. Its main purpose is to allow easily testing contract bindings.
 type SimulatedBackend struct {
-	database         kcoindb.Database // In memory database to store our testing data
-	*core.BlockChain                  // Kowala blockchain to handle the consensus
+	database         database.Database // In memory database to store our testing data
+	*core.BlockChain                   // Kowala blockchain to handle the consensus
 
 	mu           sync.Mutex
 	pendingBlock *types.Block   // Currently pending block that will be imported on request
 	pendingState *state.StateDB // Currently pending state that will be the active on on request
 
-	events *filters.EventSystem // Event system for filtering log events live
+	//events *filters.EventSystem // Event system for filtering log events live
 
 	config *params.ChainConfig
 }
@@ -47,7 +46,7 @@ type SimulatedBackend struct {
 // NewSimulatedBackend creates a new binding backend using a simulated blockchain
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
-	database := kcoindb.NewMemDatabase()
+	database := database.NewMemDatabase()
 	genesis := core.Genesis{Config: params.AllKonsensusProtocolChanges, Alloc: alloc}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, konsensus.NewFaker(), vm.Config{})
@@ -56,7 +55,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		database:   database,
 		BlockChain: blockchain,
 		config:     genesis.Config,
-		events:     filters.NewEventSystem(new(event.TypeMux), &filterBackend{database, blockchain}, false),
+		//events:     filters.NewEventSystem(new(event.TypeMux), &filterBackend{database, blockchain}, false),
 	}
 	backend.rollback()
 	return backend
@@ -295,6 +294,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 	return nil
 }
 
+/*
 // FilterLogs executes a log filter operation, blocking during execution and
 // returning all the results in one batch.
 //
@@ -322,7 +322,9 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query kowala.FilterQu
 	}
 	return res, nil
 }
+*/
 
+/*
 // SubscribeFilterLogs creates a background log filtering operation, returning a
 // subscription immediately, which can be used to stream the found events.
 func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query kowala.FilterQuery, ch chan<- types.Log) (kowala.Subscription, error) {
@@ -356,6 +358,7 @@ func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query kowala
 		}
 	}), nil
 }
+*/
 
 // callmsg implements core.Message to allow passing it as a transaction simulator.
 type callmsg struct {
@@ -373,12 +376,12 @@ func (m callmsg) Data() []byte         { return m.CallMsg.Data }
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
 type filterBackend struct {
-	db kcoindb.Database
+	db database.Database
 	bc *core.BlockChain
 }
 
-func (fb *filterBackend) ChainDb() kcoindb.Database { return fb.db }
-func (fb *filterBackend) EventMux() *event.TypeMux  { panic("not supported") }
+func (fb *filterBackend) ChainDb() database.Database { return fb.db }
+func (fb *filterBackend) EventMux() *event.TypeMux   { panic("not supported") }
 
 func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
 	if block == rpc.LatestBlockNumber {

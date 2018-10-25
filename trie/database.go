@@ -27,6 +27,7 @@ import (
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/types"
 )
 
 var (
@@ -64,12 +65,12 @@ type DatabaseReader interface {
 type Database struct {
 	diskdb database.Database // Persistent storage for matured trie nodes
 
-	nodes  map[common.Hash]*cachedNode // Data and references relationships of a node
-	oldest common.Hash                 // Oldest tracked node, flush-list head
-	newest common.Hash                 // Newest tracked node, flush-list tail
+	nodes  map[types.Hash]*cachedNode // Data and references relationships of a node
+	oldest types.Hash                 // Oldest tracked node, flush-list head
+	newest types.Hash                 // Newest tracked node, flush-list tail
 
-	preimages map[common.Hash][]byte // Preimages of nodes from the secure trie
-	seckeybuf [secureKeyLength]byte  // Ephemeral buffer for calculating preimage keys
+	preimages map[types.Hash][]byte // Preimages of nodes from the secure trie
+	seckeybuf [secureKeyLength]byte // Ephemeral buffer for calculating preimage keys
 
 	gctime  time.Duration      // Time spent on garbage collection since last commit
 	gcnodes uint64             // Nodes garbage collected since last commit
