@@ -10,37 +10,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
 	"github.com/kowala-tech/equilibrium/common"
-	"github.com/kowala-tech/equilibrium/core/rawdb"
-	"github.com/kowala-tech/equilibrium/kcoindb"
+	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/services/archive/types/rawdb"
 	"github.com/kowala-tech/equilibrium/types"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
-const (
-	headerCacheLimit = 512
-	numberCacheLimit = 2048
-)
-
-// HeaderChain implements the basic block header chain logic that is shared by
-// core.BlockChain and light.LightChain. It is not usable in itself, only as
-// a part of either structure.
+// HeaderChain implements the basic block header chain logic that is used by
+// core.BlockChain - it is not usable in itself.
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
 	config *params.ChainConfig
 
-	chainDb       kcoindb.Database
-	genesisHeader *types.Header
+	chainDb       database.Database
+	genesisHeader *Header
 
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
-	currentHeaderHash common.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
+	currentHeaderHash Hash         // Hash of the current head of the header chain (prevent recomputing all the time)
 
-	headerCache *lru.Cache // Cache for the most recent block headers
-	numberCache *lru.Cache // Cache for the most recent block numbers
+	store Store
 
 	procInterrupt func() bool
 
@@ -52,9 +44,7 @@ type HeaderChain struct {
 //  getValidator should return the parent's validator
 //  procInterrupt points to the parent's interrupt semaphore
 //  wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb kcoindb.Database, config *params.ChainConfig, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
-	headerCache, _ := lru.New(headerCacheLimit)
-	numberCache, _ := lru.New(numberCacheLimit)
+func NewHeaderChain(chainDb database.Database, config *params.ChainConfig, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -63,10 +53,9 @@ func NewHeaderChain(chainDb kcoindb.Database, config *params.ChainConfig, engine
 	}
 
 	hc := &HeaderChain{
-		config:        config,
-		chainDb:       chainDb,
-		headerCache:   headerCache,
-		numberCache:   numberCache,
+		config:  config,
+		chainDb: chainDb,
+
 		procInterrupt: procInterrupt,
 		rand:          mrand.New(mrand.NewSource(seed.Int64())),
 		engine:        engine,
@@ -78,7 +67,7 @@ func NewHeaderChain(chainDb kcoindb.Database, config *params.ChainConfig, engine
 	}
 
 	hc.currentHeader.Store(hc.genesisHeader)
-	if head := rawdb.ReadHeadBlockHash(chainDb); head != (common.Hash{}) {
+	if head := rawdb.ReadHeadBlockHash(chainDb); head != (Hash{}) {
 		if chead := hc.GetHeaderByHash(head); chead != nil {
 			hc.currentHeader.Store(chead)
 		}
@@ -90,16 +79,8 @@ func NewHeaderChain(chainDb kcoindb.Database, config *params.ChainConfig, engine
 
 // GetBlockNumber retrieves the block number belonging to the given hash
 // from the cache or database
-func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
-	if cached, ok := hc.numberCache.Get(hash); ok {
-		number := cached.(uint64)
-		return &number
-	}
-	number := rawdb.ReadHeaderNumber(hc.chainDb, hash)
-	if number != nil {
-		hc.numberCache.Add(hash, *number)
-	}
-	return number
+func (hc *HeaderChain) GetBlockNumber(hash Hash) *uint64 {
+	return hc.store.GetBlockNumber(hash)
 }
 
 // WriteHeader writes a header into the local chain, given that its parent is
@@ -110,7 +91,7 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 // without the real blocks. Hence, writing headers directly should only be done
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
-func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, err error) {
+func (hc *HeaderChain) WriteHeader(header *Header) (status WriteStatus, err error) {
 	// Cache some values to prevent constant recalculation
 	var (
 		hash   = header.Hash()
@@ -127,7 +108,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 		batch := hc.chainDb.NewBatch()
 		for i := number + 1; ; i++ {
 			hash := rawdb.ReadCanonicalHash(hc.chainDb, i)
-			if hash == (common.Hash{}) {
+			if hash == (Hash{}) {
 				break
 			}
 			rawdb.DeleteCanonicalHash(batch, i)
@@ -157,15 +138,15 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 		rawdb.WriteHeadHeaderHash(hc.chainDb, hash)
 
 		hc.currentHeaderHash = hash
-		hc.currentHeader.Store(types.CopyHeader(header))
+		hc.currentHeader.Store(CopyHeader(header))
 
 		status = CanonStatTy
 	} else {
 		status = SideStatTy
 	}
 
-	hc.headerCache.Add(hash, header)
-	hc.numberCache.Add(hash, number)
+	hc.store.AddHeader(hash, header)
+	hc.store.AddNumber(hash, number)
 
 	return
 }
@@ -175,9 +156,9 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 // processed and light chain events sent, while in a BlockChain this is not
 // necessary since chain events are sent after inserting blocks. Second, the
 // header writes should be protected by the parent chain mutex individually.
-type WhCallback func(*types.Header) error
+type WhCallback func(*Header) error
 
-func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
+func (hc *HeaderChain) ValidateHeaderChain(chain []*Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
@@ -215,10 +196,6 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 			log.Debug("Premature abort during headers verification")
 			return 0, errors.New("aborted")
 		}
-		// If the header is a banned one, straight out abort
-		if BadHashes[header.Hash()] {
-			return i, ErrBlacklistedHash
-		}
 		// Otherwise wait for headers checks and ensure they pass
 		if err := <-results; err != nil {
 			return i, err
@@ -236,7 +213,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verfy nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start time.Time) (int, error) {
+func (hc *HeaderChain) InsertHeaderChain(chain []*Header, writeHeader WhCallback, start time.Time) (int, error) {
 	// Collect some import statistics to report on
 	stats := struct{ processed, ignored int }{}
 	// All headers passed verification, import them into the database
@@ -266,14 +243,14 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCa
 
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given
 // hash, fetching towards the genesis block.
-func (hc *HeaderChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []common.Hash {
+func (hc *HeaderChain) GetBlockHashesFromHash(hash types.Hash, max uint64) []types.Hash {
 	// Get the origin header from which to fetch
 	header := hc.GetHeaderByHash(hash)
 	if header == nil {
 		return nil
 	}
 	// Iterate the headers until enough is collected or the genesis reached
-	chain := make([]common.Hash, 0, max)
+	chain := make([]Hash, 0, max)
 	for i := uint64(0); i < max; i++ {
 		next := header.ParentHash
 		if header = hc.GetHeader(next, header.Number.Uint64()-1); header == nil {
@@ -292,16 +269,16 @@ func (hc *HeaderChain) GetBlockHashesFromHash(hash common.Hash, max uint64) []co
 // number of blocks to be individually checked before we reach the canonical chain.
 //
 // Note: ancestor == 0 returns the same block, 1 returns its parent and so on.
-func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, maxNonCanonical *uint64) (common.Hash, uint64) {
+func (hc *HeaderChain) GetAncestor(hash types.Hash, number, ancestor uint64, maxNonCanonical *uint64) (types.Hash, uint64) {
 	if ancestor > number {
-		return common.Hash{}, 0
+		return types.Hash{}, 0
 	}
 	if ancestor == 1 {
 		// in this case it is cheaper to just read the header
 		if header := hc.GetHeader(hash, number); header != nil {
 			return header.ParentHash, number - 1
 		} else {
-			return common.Hash{}, 0
+			return types.Hash{}, 0
 		}
 	}
 	for ancestor != 0 {
@@ -310,13 +287,13 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
 		}
 		if *maxNonCanonical == 0 {
-			return common.Hash{}, 0
+			return types.Hash{}, 0
 		}
 		*maxNonCanonical--
 		ancestor--
 		header := hc.GetHeader(hash, number)
 		if header == nil {
-			return common.Hash{}, 0
+			return types.Hash{}, 0
 		}
 		hash = header.ParentHash
 		number--
@@ -326,23 +303,13 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (hc *HeaderChain) GetHeader(hash common.Hash, number uint64) *types.Header {
-	// Short circuit if the header's already in the cache, retrieve otherwise
-	if header, ok := hc.headerCache.Get(hash); ok {
-		return header.(*types.Header)
-	}
-	header := rawdb.ReadHeader(hc.chainDb, hash, number)
-	if header == nil {
-		return nil
-	}
-	// Cache the found header for next time and return
-	hc.headerCache.Add(hash, header)
-	return header
+func (hc *HeaderChain) GetHeader(hash types.Hash, number uint64) *types.Header {
+	return hc.store.GetHeader(hash, Number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (hc *HeaderChain) GetHeaderByHash(hash common.Hash) *types.Header {
+func (hc *HeaderChain) GetHeaderByHash(hash types.Hash) *Header {
 	number := hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -351,18 +318,15 @@ func (hc *HeaderChain) GetHeaderByHash(hash common.Hash) *types.Header {
 }
 
 // HasHeader checks if a block header is present in the database or not.
-func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
-	if hc.numberCache.Contains(hash) || hc.headerCache.Contains(hash) {
-		return true
-	}
-	return rawdb.HasHeader(hc.chainDb, hash, number)
+func (hc *HeaderChain) HasHeader(hash types.Hash, number uint64) bool {
+	hc.store.HasHeader(hash, number)
 }
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
-func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
+func (hc *HeaderChain) GetHeaderByNumber(number uint64) *Header {
 	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
-	if hash == (common.Hash{}) {
+	if hash == (Hash{}) {
 		return nil
 	}
 	return hc.GetHeader(hash, number)
@@ -382,13 +346,13 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeaderHash = head.Hash()
 }
 
-// DeleteCallback is a callback function that is called by SetHead before
+// DeleteCallback is a callback function that is called by RewindTo before
 // each header is deleted.
-type DeleteCallback func(rawdb.DatabaseDeleter, common.Hash, uint64)
+type DeleteCallback func(rawdb.DatabaseDeleter, types.Hash, uint64)
 
-// SetHead rewinds the local chain to a new head. Everything above the new head
+// RewindTorewinds the local chain to a new head. Everything above the new head
 // will be deleted and the new one set.
-func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
+func (hc *HeaderChain) RewindTo(head uint64, delFn DeleteCallback) {
 	height := uint64(0)
 
 	if hdr := hc.CurrentHeader(); hdr != nil {
@@ -412,8 +376,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	batch.Write()
 
 	// Clear out any stale content from the caches
-	hc.headerCache.Purge()
-	hc.numberCache.Purge()
+	hc.store.PurgeHeaderCaches()
 
 	if hc.CurrentHeader() == nil {
 		hc.currentHeader.Store(hc.genesisHeader)
@@ -436,6 +399,6 @@ func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }
 
 // GetBlock implements consensus.ChainReader, and returns nil for every input as
 // a header chain does not have blocks available for retrieval.
-func (hc *HeaderChain) GetBlock(hash common.Hash, number uint64) *types.Block {
+func (hc *HeaderChain) GetBlock(hash types.Hash, number uint64) *Block {
 	return nil
 }

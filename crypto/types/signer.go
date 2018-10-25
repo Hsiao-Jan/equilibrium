@@ -1,3 +1,17 @@
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package types
 
 import (
@@ -163,19 +177,6 @@ func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (Address, err
 	return addr, nil
 }
 
-// deriveChainID derives the chain id from the given v parameter
-func deriveChainID(v *big.Int) *big.Int {
-	if v.BitLen() <= 64 {
-		v := v.Uint64()
-		if v == 27 || v == 28 {
-			return new(big.Int)
-		}
-		return new(big.Int).SetUint64((v - 35) / 2)
-	}
-	v = new(big.Int).Sub(v, big.NewInt(35))
-	return v.Div(v, big.NewInt(2))
-}
-
 // SignTx signs the transaction using the given signer and private key
 func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
 	h := signer.Hash(tx)
@@ -207,6 +208,13 @@ func SignVote(vote *Vote, signer Signer, prv *ecdsa.PrivateKey) (*Vote, error) {
 	return vote.WithSignature(signer, sig)
 }
 
+// sigCache is used to cache the derived sender and contains
+// the signer used to derive it.
+type sigCache struct {
+	signer Signer
+	from   Address
+}
+
 func TxSender(signer Signer, tx *Transaction) (Address, error) {
 	if sc := tx.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
@@ -220,7 +228,7 @@ func TxSender(signer Signer, tx *Transaction) (Address, error) {
 
 	addr, err := signer.Sender(tx)
 	if err != nil {
-		return common.Address{}, err
+		return Address{}, err
 	}
 	tx.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
@@ -239,7 +247,7 @@ func ProposalSender(signer Signer, proposal *Proposal) (Address, error) {
 
 	addr, err := signer.Sender(proposal)
 	if err != nil {
-		return common.Address{}, err
+		return Address{}, err
 	}
 	proposal.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
@@ -258,7 +266,7 @@ func VoteSender(signer Signer, vote *Vote) (Address, error) {
 
 	addr, err := signer.Sender(vote)
 	if err != nil {
-		return common.Address{}, err
+		return Address{}, err
 	}
 	vote.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil

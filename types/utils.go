@@ -1,40 +1,27 @@
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package types
 
 import (
 	"bytes"
-	"fmt"
+	"math/big"
 
+	"github.com/kowala-tech/equilibrium/crypto/sha3"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/trie"
-	"github.com/kowala-tech/kcoin/client/crypto/sha3"
 )
-
-// StorageSize is a wrapper around a float value that supports user friendly
-// formatting.
-type StorageSize float64
-
-// String implements the stringer interface.
-func (s StorageSize) String() string {
-	if s > 1000000 {
-		return fmt.Sprintf("%.2f mB", s/1000000)
-	} else if s > 1000 {
-		return fmt.Sprintf("%.2f kB", s/1000)
-	} else {
-		return fmt.Sprintf("%.2f B", s)
-	}
-}
-
-// TerminalString implements log.TerminalStringer, formatting a string for console
-// output during logging.
-func (s StorageSize) TerminalString() string {
-	if s > 1000000 {
-		return fmt.Sprintf("%.2fmB", s/1000000)
-	} else if s > 1000 {
-		return fmt.Sprintf("%.2fkB", s/1000)
-	} else {
-		return fmt.Sprintf("%.2fB", s)
-	}
-}
 
 type DerivableList interface {
 	Len() int
@@ -57,4 +44,17 @@ func rlpHash(x interface{}) (h Hash) {
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h
+}
+
+// deriveChainID derives the chain id from the given v parameter.
+func deriveChainID(v *big.Int) *big.Int {
+	if v.BitLen() <= 64 {
+		v := v.Uint64()
+		if v == 27 || v == 28 {
+			return new(big.Int)
+		}
+		return new(big.Int).SetUint64((v - 35) / 2)
+	}
+	v = new(big.Int).Sub(v, big.NewInt(35))
+	return v.Div(v, big.NewInt(2))
 }

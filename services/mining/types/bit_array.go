@@ -49,6 +49,7 @@ func (array *BitArray) Set(i int) {
 	array.bits[i>>div] |= uint64(1) << (uint64(i) & mod)
 }
 
+/*
 // Get returns the bit value.
 func (array *BitArray) Get(i int) bool {
 	array.bitsMu.Lock()
@@ -59,8 +60,7 @@ func (array *BitArray) Get(i int) bool {
 // Size returns the number of bits in the bit array.
 func (array *BitArray) Size() int { return array.nbits }
 
-/*
-
+// Copy returns a deep copy of the bit array.
 func (bA *BitArray) Copy() *BitArray {
 	if bA == nil {
 		return nil
@@ -305,5 +305,4 @@ func (bA *BitArray) Update(o *BitArray) {
 
 	copy(bA.Elems, o.Elems)
 }
-
 */

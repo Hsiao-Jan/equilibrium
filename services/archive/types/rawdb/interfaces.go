@@ -1,4 +1,4 @@
-// Copyright 2015 The go-ethereum Authors
+// Copyright 2018 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,20 +14,20 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package trie
+package rawdb
 
-import (
-	"fmt"
-)
-
-// MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)
-// in the case where a trie node is not present in the local database. It contains
-// information necessary for retrieving the missing node.
-type MissingNodeError struct {
-	NodeHash Hash   // hash of the missing node
-	Path     []byte // hex-encoded path to the missing node
+// DatabaseReader wraps the Has and Get method of a backing data store.
+type DatabaseReader interface {
+	Has(key []byte) (bool, error)
+	Get(key []byte) ([]byte, error)
 }
 
-func (err *MissingNodeError) Error() string {
-	return fmt.Sprintf("missing trie node %x (path %x)", err.NodeHash, err.Path)
+// DatabaseWriter wraps the Put method of a backing data store.
+type DatabaseWriter interface {
+	Put(key []byte, value []byte) error
+}
+
+// DatabaseDeleter wraps the Delete method of a backing data store.
+type DatabaseDeleter interface {
+	Delete(key []byte) error
 }

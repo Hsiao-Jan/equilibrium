@@ -97,10 +97,17 @@ func newTransaction(nonce uint64, recipient *Address, amount *big.Int, computeLi
 	return &Transaction{data: data}
 }
 
-func (tx *Transaction) Payload() []byte      { return common.CopyBytes(tx.data.Payload) }
+// Payload returns the transaction data payload.
+func (tx *Transaction) Payload() []byte { return common.CopyBytes(tx.data.Payload) }
+
+// ComputeLimit returns the maximum required computational effort for the transaction execution.
 func (tx *Transaction) ComputeLimit() uint64 { return tx.data.ComputeLimit }
-func (tx *Transaction) Amount() *big.Int     { return new(big.Int).Set(tx.data.Amount) }
-func (tx *Transaction) Nonce() uint64        { return tx.data.AccountNonce }
+
+// Amount returns the transaction amount.
+func (tx *Transaction) Amount() *big.Int { return new(big.Int).Set(tx.data.Amount) }
+
+// Nonce represents the account nonce.
+func (tx *Transaction) Nonce() uint64 { return tx.data.AccountNonce }
 
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.
@@ -118,8 +125,7 @@ func (tx *Transaction) SignatureValues() (R, S, V *big.Int) {
 	return
 }
 
-// Hash hashes the RLP encoding of tx.
-// It uniquely identifies the transaction.
+// Hash hashes the RLP encoding of tx. It uniquely identifies the transaction.
 func (tx *Transaction) Hash() Hash {
 	if hash := tx.hash.Load(); hash != nil {
 		return hash.(Hash)
@@ -127,6 +133,18 @@ func (tx *Transaction) Hash() Hash {
 	v := rlpHash(tx)
 	tx.hash.Store(v)
 	return v
+}
+
+// HashWithData returns the transaction hash to be signed by the sender.
+func (tx *Transaction) HashWithData(data ...interface{}) Hash {
+	txData := []interface{}{
+		tx.data.AccountNonce,
+		tx.data.ComputeLimit,
+		tx.data.Recipient,
+		tx.data.Amount,
+		tx.data.Payload,
+	}
+	return rlpHash(append(txData, data...))
 }
 
 // Size returns the true RLP encoded storage size of the transaction, either by
@@ -154,6 +172,14 @@ func (tx *Transaction) ComputeFee() *big.Int {
 // Cost returns the transaction cost for a specific stabilization level.
 func (tx *Transaction) Cost(stabilizationLevel uint64) *big.Int {
 	return new(big.Int).Add(new(big.Int).Add(tx.ComputeFee(), tx.StabilityFee(stabilizationLevel)), tx.Amount())
+}
+
+// Protected specifies whether the transaction is protected from replay attacks or not.
+func (tx *Transaction) Protected() bool { return isProtectedV(tx.data.V }
+
+// ChainID derives the transaction chain ID from the signature.
+func (tx *Transaction) ChainID() *big.Int {
+	return deriveChainID(tx.data.V)
 }
 
 // WithSignature returns a new transaction with the given signature.
@@ -202,7 +228,7 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	if withSignature {
 		var V byte
 		if isProtectedV(data.V) {
-			chainID := deriveChainId(data.V).Uint64()
+			chainID := deriveChainID(data.V).Uint64()
 			V = byte(data.V.Uint64() - 35 - 2*chainID)
 		} else {
 			V = byte(data.V.Uint64() - 27)
@@ -216,6 +242,7 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+// String presents the transaction values.
 func (tx *Transaction) String() string {
 	var from, recipient string
 	if tx.data.V != nil {
@@ -281,7 +308,7 @@ func (s Transactions) GetRlp(i int) []byte {
 	return enc
 }
 
-// TxDifference returns a new set t which is the difference between a to b.
+// TxDifference returns a new set of transactions consisting in the difference between a and b.
 func TxDifference(a, b Transactions) (keep Transactions) {
 	keep = make(Transactions, 0, len(a))
 

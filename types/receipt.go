@@ -50,7 +50,7 @@ type Receipt struct {
 	ComputeFee   *big.Int `json:"computeFee"                    gencodec:"required"`
 	StabilityFee *big.Int `json:"stabilityFee"                  gencodec:"required"`
 
-	// Implementation fields (don't reorder!)
+	// Derived fields
 	TxHash          common.Hash    `json:"transactionHash"  gencodec:"required"`
 	ContractAddress common.Address `json:"contractAddress"`
 }

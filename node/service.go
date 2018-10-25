@@ -19,6 +19,7 @@ import (
 	"reflect"
 
 	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/crypto/types"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/p2p"
 	"github.com/kowala-tech/kcoin/client/consensus"
@@ -37,6 +38,7 @@ type ServiceContext struct {
 	EventMux        *event.TypeMux           // Event multiplexer used for decoupled notifications
 	AccountManager  *accounts.Manager        // Account manager created by the node.
 	ConsensusEngine consensus.Engine         // Consensus Engine used by the node.
+	Signer          types.Signer             // Signer used by the node
 }
 
 // Service retrieves a currently running service registered of a specific type.
