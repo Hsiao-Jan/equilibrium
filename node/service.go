@@ -36,6 +36,7 @@ type ServiceContext struct {
 	//AccountManager  *accounts.Manager        // Account manager created by the node.
 	//ConsensusEngine consensus.Engine         // Consensus Engine used by the node.
 	//Signer types.Signer // Signer used by the node
+	// Currency string (???)
 }
 
 // Service retrieves a currently running service registered of a specific type.

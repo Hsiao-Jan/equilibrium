@@ -12,38 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package transaction
 
 import (
-	"fmt"
 	"io"
 	"math/big"
 	"sync/atomic"
 
-	"github.com/kowala-tech/equilibrium/params"
-
+	"github.com/kowala-tech/equilibrium/accounts"
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/params"
 	"github.com/kowala-tech/equilibrium/stabilization"
 )
 
 //go:generate gencodec -type txData -field-override txDataMarshaling -out gen_transaction_json.go
 
 type txData struct {
-	AccountNonce uint64   `json:"accountNonce" gencodec:"required"`
-	ComputeLimit uint64   `json:"computeLimit" gencodec:"required"`
-	Recipient    *Address `json:"recipient"           rlp:"nil"` // nil means contract creation
-	Amount       *big.Int `json:"amount"       gencodec:"required"`
-	Payload      []byte   `json:"payload"      gencodec:"required"`
+	AccountNonce uint64            `json:"accountNonce" gencodec:"required"`
+	ComputeLimit uint64            `json:"computeLimit" gencodec:"required"`
+	Recipient    *accounts.Address `json:"recipient"           rlp:"nil"` // nil means contract creation
+	Amount       *big.Int          `json:"amount"       gencodec:"required"`
+	Payload      []byte            `json:"payload"      gencodec:"required"`
 
 	V *big.Int `json:"v" gencodec:"required"`
 	R *big.Int `json:"r" gencodec:"required"`
 	S *big.Int `json:"s" gencodec:"required"`
 
 	// This is only used when marshaling to JSON.
-	Hash *Hash `json:"hash" rlp:"-"`
+	Hash *crypto.Hash `json:"hash" rlp:"-"`
 }
 
 type txDataMarshaling struct {
@@ -67,7 +66,7 @@ type Transaction struct {
 	from atomic.Value
 }
 
-func NewTransaction(nonce uint64, recipient Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+func NewTransaction(nonce uint64, recipient accounts.Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	return newTransaction(nonce, &recipient, amount, computeLimit, payload)
 }
 
@@ -75,7 +74,7 @@ func NewContractCreation(nonce uint64, amount *big.Int, computeLimit uint64, pay
 	return newTransaction(nonce, nil, amount, computeLimit, payload)
 }
 
-func newTransaction(nonce uint64, recipient *Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
+func newTransaction(nonce uint64, recipient *accounts.Address, amount *big.Int, computeLimit uint64, payload []byte) *Transaction {
 	if len(payload) > 0 {
 		payload = common.CopyBytes(payload)
 	}
@@ -111,7 +110,7 @@ func (tx *Transaction) Nonce() uint64 { return tx.data.AccountNonce }
 
 // To returns the recipient address of the transaction.
 // It returns nil if the transaction is a contract creation.
-func (tx *Transaction) To() *Address {
+func (tx *Transaction) To() *accounts.Address {
 	if tx.data.Recipient == nil {
 		return nil
 	}
@@ -126,17 +125,17 @@ func (tx *Transaction) SignatureValues() (R, S, V *big.Int) {
 }
 
 // Hash hashes the RLP encoding of tx. It uniquely identifies the transaction.
-func (tx *Transaction) Hash() Hash {
+func (tx *Transaction) Hash() crypto.Hash {
 	if hash := tx.hash.Load(); hash != nil {
-		return hash.(Hash)
+		return hash.(crypto.Hash)
 	}
-	v := rlpHash(tx)
+	v := crypto.RLPHash(tx)
 	tx.hash.Store(v)
 	return v
 }
 
 // HashWithData returns the transaction hash to be signed by the sender.
-func (tx *Transaction) HashWithData(data ...interface{}) Hash {
+func (tx *Transaction) HashWithData(data ...interface{}) crypto.Hash {
 	txData := []interface{}{
 		tx.data.AccountNonce,
 		tx.data.ComputeLimit,
@@ -144,19 +143,19 @@ func (tx *Transaction) HashWithData(data ...interface{}) Hash {
 		tx.data.Amount,
 		tx.data.Payload,
 	}
-	return rlpHash(append(txData, data...))
+	return crypto.RLPHash(append(txData, data...))
 }
 
 // Size returns the true RLP encoded storage size of the transaction, either by
 // encoding and returning it, or returning a previsouly cached value.
-func (tx *Transaction) Size() StorageSize {
+func (tx *Transaction) Size() common.StorageSize {
 	if size := tx.size.Load(); size != nil {
-		return size.(StorageSize)
+		return size.(common.StorageSize)
 	}
-	c := writeCounter(0)
+	c := common.WriteCounter(0)
 	rlp.Encode(&c, &tx.data)
-	tx.size.Store(StorageSize(c))
-	return StorageSize(c)
+	tx.size.Store(common.StorageSize(c))
+	return common.StorageSize(c)
 }
 
 // StabilityFee returns the stability fee of a transaction for a specific stabilization level.
@@ -175,15 +174,15 @@ func (tx *Transaction) Cost(stabilizationLevel uint64) *big.Int {
 }
 
 // Protected specifies whether the transaction is protected from replay attacks or not.
-func (tx *Transaction) Protected() bool { return isProtectedV(tx.data.V }
+func (tx *Transaction) Protected() bool { return isProtectedV(tx.data.V) }
 
 // ChainID derives the transaction chain ID from the signature.
 func (tx *Transaction) ChainID() *big.Int {
-	return deriveChainID(tx.data.V)
+	return common.DeriveChainID(tx.data.V)
 }
 
 // WithSignature returns a new transaction with the given signature.
-func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, error) {
+func (tx *Transaction) WithSignature(signer crypto.Signer, sig []byte) (*Transaction, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err
@@ -203,7 +202,7 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
 	err := s.Decode(&tx.data)
 	if err == nil {
-		tx.size.Store(StorageSize(rlp.ListSize(size)))
+		tx.size.Store(common.StorageSize(rlp.ListSize(size)))
 	}
 
 	return err
@@ -228,69 +227,18 @@ func (tx *Transaction) UnmarshalJSON(input []byte) error {
 	if withSignature {
 		var V byte
 		if isProtectedV(data.V) {
-			chainID := deriveChainID(data.V).Uint64()
+			chainID := common.DeriveChainID(data.V).Uint64()
 			V = byte(data.V.Uint64() - 35 - 2*chainID)
 		} else {
 			V = byte(data.V.Uint64() - 27)
 		}
 		if !crypto.ValidateSignatureValues(V, data.R, data.S, false) {
-			return errInvalidSig
+			return crypto.ErrInvalidSig
 		}
 	}
 
 	*tx = Transaction{data: data}
 	return nil
-}
-
-// String presents the transaction values.
-func (tx *Transaction) String() string {
-	var from, recipient string
-	if tx.data.V != nil {
-		// make a best guess about the signer and use that to derive
-		// the sender.
-		signer := NewProductionSigner(deriveChainID(tx.data.V))
-		if f, err := TxSender(signer, tx); err != nil { // derive but don't cache
-			from = "[invalid sender: invalid sig] " + err.Error()
-		} else {
-			from = fmt.Sprintf("%x", f[:])
-		}
-	} else {
-		from = "[invalid sender: nil V field]"
-	}
-
-	if tx.data.Recipient == nil {
-		recipient = "[contract creation]"
-	} else {
-		recipient = fmt.Sprintf("%x", tx.data.Recipient[:])
-	}
-	enc, _ := rlp.EncodeToBytes(&tx.data)
-	return fmt.Sprintf(`
-	TX(%x)
-	Contract Creation:      %v
-	From:                   %s
-	Recipient:              %s
-	Nonce:                  %v
-	ComputeLimit:           %v
-	Amount:                 %#x
-	Data:                   0x%x
-	V:                      %#x
-	R:                      %#x
-	S:                      %#x
-	Hex:                    %x
-`,
-		tx.Hash(),
-		tx.data.Recipient == nil,
-		from,
-		recipient,
-		tx.data.AccountNonce,
-		tx.data.ComputeLimit,
-		tx.data.Amount,
-		tx.data.Payload,
-		tx.data.V,
-		tx.data.R,
-		tx.data.S,
-		enc,
-	)
 }
 
 // Transactions is a Transaction slice type for basic sorting.
@@ -312,7 +260,7 @@ func (s Transactions) GetRlp(i int) []byte {
 func TxDifference(a, b Transactions) (keep Transactions) {
 	keep = make(Transactions, 0, len(a))
 
-	remove := make(map[Hash]struct{})
+	remove := make(map[crypto.Hash]struct{})
 	for _, tx := range b {
 		remove[tx.Hash()] = struct{}{}
 	}

@@ -1,19 +1,21 @@
 package types
 
+/*
 import (
 	"errors"
 	"math"
 	"math/big"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/vm"
+	eft "github.com/kowala-tech/equilibrium/params/effort"
+	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/equilibrium/vm"
 	"github.com/kowala-tech/kcoin/client/log"
-	effrt "github.com/kowala-tech/kcoin/client/params/effort"
 )
 
 var (
 	errInsufficientBalanceForComputationalResource = errors.New("insufficient balance to pay for computational resource")
 )
+*/
 
 /*
 The State Transitioning Model
@@ -32,6 +34,7 @@ The state transitioning model does all all the necessary work to work out a vali
 5) Run Script section
 6) Derive new state root
 */
+/*
 type StateTransition struct {
 	crpool          *ComputationalResourcePool
 	msg             Message
@@ -45,8 +48,8 @@ type StateTransition struct {
 
 // Message represents a message sent to a contract.
 type Message interface {
-	From() common.Address
-	To() *common.Address
+	From() types.Address
+	To() *types.Address
 
 	ComputeLimit() uint64
 	Value() *big.Int
@@ -61,9 +64,9 @@ func IntrinsicEffort(data []byte, contractCreation bool) (uint64, error) {
 	// Set the starting effort for the raw transaction
 	var effort uint64
 	if contractCreation {
-		effort = effrt.TxContractCreation
+		effort = eft.TxContractCreation
 	} else {
-		effort = effrt.Tx
+		effort = eft.Tx
 	}
 	// Bump the required effort by the amount of transactional data
 	if len(data) > 0 {
@@ -75,16 +78,16 @@ func IntrinsicEffort(data []byte, contractCreation bool) (uint64, error) {
 			}
 		}
 		// Make sure we don't exceed uint64 for all data combinations
-		if (math.MaxUint64-effort)/effrt.TxDataNonZero < nz {
+		if (math.MaxUint64-effort)/eft.TxDataNonZero < nz {
 			return 0, vm.ErrOutOfComputationalResource
 		}
-		effort += nz * effrt.TxDataNonZero
+		effort += nz * eft.TxDataNonZero
 
 		z := uint64(len(data)) - nz
-		if (math.MaxUint64-effort)/effrt.TxDataZero < z {
+		if (math.MaxUint64-effort)/eft.TxDataZero < z {
 			return 0, vm.ErrOutOfComputationalResource
 		}
-		effort += z * effrt.TxDataZero
+		effort += z * eft.TxDataZero
 	}
 	return effort, nil
 }
@@ -113,9 +116,9 @@ func ApplyMessage(vm *vm.VM, msg Message, crpool *ComputationalResourcePool) ([]
 }
 
 // to returns the recipient of the message.
-func (st *StateTransition) to() common.Address {
-	if st.msg == nil || st.msg.To() == nil /* contract creation */ {
-		return common.Address{}
+func (st *StateTransition) to() types.Address {
+	if st.msg == nil || st.msg.To() == nil  contract creation  {
+		return types.Address{}
 	}
 	return *st.msg.To()
 }
@@ -227,3 +230,5 @@ func (st *StateTransition) refundResource() {
 func (st *StateTransition) resourceUsed() uint64 {
 	return st.initialResource - st.resource
 }
+
+*/

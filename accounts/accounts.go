@@ -22,15 +22,13 @@ import (
 	"math/big"
 
 	"github.com/kowala-tech/equilibrium/event"
-	eqb "github.com/kowala-tech/equilibrium/event"
-	"github.com/kowala-tech/equilibrium/types"
 )
 
 // Account represents a Kowala account located at a specific location defined
 // by the optional URL field.
 type Account struct {
-	Address types.Address `json:"address"` // Kowala account address derived from the key
-	URL     URL           `json:"url"`     // Optional resource locator within a backend
+	Address Address `json:"address"` // Kowala account address derived from the key
+	URL     URL     `json:"url"`     // Optional resource locator within a backend
 }
 
 // Wallet represents a software or hardware wallet that might contain one or more
@@ -85,7 +83,7 @@ type Wallet interface {
 	//
 	// You can disable automatic account discovery by calling SelfDerive with a nil
 	// chain state reader.
-	SelfDerive(base DerivationPath, chain eqb.ChainStateReader)
+	//SelfDerive(base DerivationPath, chain eqb.ChainStateReader)
 
 	// SignHash requests the wallet to sign the given hash.
 	//
@@ -100,46 +98,48 @@ type Wallet interface {
 	// the account in a keystore).
 	SignHash(account Account, hash []byte) ([]byte, error)
 
-	// SignTx requests the wallet to sign the given transaction.
-	//
-	// It looks up the account specified either solely via its address contained within,
-	// or optionally with the aid of any location metadata from the embedded URL field.
-	//
-	// If the wallet requires additional authentication to sign the request (e.g.
-	// a password to decrypt the account, or a PIN code o verify the transaction),
-	// an AuthNeededError instance will be returned, containing infos for the user
-	// about which fields or actions are needed. The user may retry by providing
-	// the needed details via SignTxWithPassphrase, or by other means (e.g. unlock
-	// the account in a keystore).
-	SignTx(account Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	/*
+		// SignTx requests the wallet to sign the given transaction.
+		//
+		// It looks up the account specified either solely via its address contained within,
+		// or optionally with the aid of any location metadata from the embedded URL field.
+		//
+		// If the wallet requires additional authentication to sign the request (e.g.
+		// a password to decrypt the account, or a PIN code o verify the transaction),
+		// an AuthNeededError instance will be returned, containing infos for the user
+		// about which fields or actions are needed. The user may retry by providing
+		// the needed details via SignTxWithPassphrase, or by other means (e.g. unlock
+		// the account in a keystore).
+		SignTx(account Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
 
-	// SignProposal requests the wallet to sign the given proposal.
-	SignProposal(account Account, proposal *types.Proposal, chainID *big.Int) (*types.Proposal, error)
+		// SignProposal requests the wallet to sign the given proposal.
+		SignProposal(account Account, proposal *types.Proposal, chainID *big.Int) (*types.Proposal, error)
 
-	// SignVote requests the wallet to sign the given proposal.
-	SignVote(account Account, vote *types.Vote, chainID *big.Int) (*types.Vote, error)
+		// SignVote requests the wallet to sign the given proposal.
+		SignVote(account Account, vote *types.Vote, chainID *big.Int) (*types.Vote, error)
 
-	// SignHashWithPassphrase requests the wallet to sign the given hash with the
-	// given passphrase as extra authentication information.
-	//
-	// It looks up the account specified either solely via its address contained within,
-	// or optionally with the aid of any location metadata from the embedded URL field.
-	SignHashWithPassphrase(account Account, passphrase string, hash []byte) ([]byte, error)
+		// SignHashWithPassphrase requests the wallet to sign the given hash with the
+		// given passphrase as extra authentication information.
+		//
+		// It looks up the account specified either solely via its address contained within,
+		// or optionally with the aid of any location metadata from the embedded URL field.
+		SignHashWithPassphrase(account Account, passphrase string, hash []byte) ([]byte, error)
 
-	// SignTxWithPassphrase requests the wallet to sign the given transaction, with the
-	// given passphrase as extra authentication information.
-	//
-	// It looks up the account specified either solely via its address contained within,
-	// or optionally with the aid of any location metadata from the embedded URL field.
-	SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+		// SignTxWithPassphrase requests the wallet to sign the given transaction, with the
+		// given passphrase as extra authentication information.
+		//
+		// It looks up the account specified either solely via its address contained within,
+		// or optionally with the aid of any location metadata from the embedded URL field.
+		SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	*/
 
 	NewKeyedTransactor(account Account, auth string) (*TransactOpts, error)
 }
 
 type TransactOpts struct {
-	From   types.Address // Kowala account to send the transaction from
-	Nonce  *big.Int      // Nonce to use for the transaction execution (nil = use pending state)
-	Signer SignerFn      // Method to use for signing the transaction (mandatory)
+	From  Address  // Kowala account to send the transaction from
+	Nonce *big.Int // Nonce to use for the transaction execution (nil = use pending state)
+	//Signer SignerFn // Method to use for signing the transaction (mandatory)
 
 	Amount       *big.Int // Funds to transfer along along the transaction (nil = 0 = no funds)
 	ComputeLimit *big.Int // Compute limit to set for the transaction execution (nil = estimate + 10%)
@@ -147,7 +147,7 @@ type TransactOpts struct {
 	Context context.Context // Network context to support cancellation and timeouts (nil = no timeout)
 }
 
-type SignerFn func(types.Signer, types.Address, *types.Transaction) (*types.Transaction, error)
+//type SignerFn func(types.Signer, Address, *types.Transaction) (*types.Transaction, error)
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can
 // sign transactions with and upon request, do so.

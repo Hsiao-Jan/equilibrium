@@ -19,35 +19,14 @@ import (
 	"github.com/kowala-tech/equilibrium/services/archive/types"
 )
 
-// @TODO - consensus engine should be part of the service context
-
+// Service represents the archive service.
 type Service struct {
 	cfg *Config
 
-	// handlers
 	blockchain *types.Blockchain
-	//engine     consensus.engine
-	//txPool      *types.TxPool
-	//peerManager *PeerManager
-
 }
 
 // New retrieves a new instance of the archive service.
 func New(cfg *Config, ctx *node.ServiceContext) (*Service, error) {
-	service := &Service{
-		//engine: ctx.ConsensusEngine,
-	}
-
-	/*
-		if !config.SyncMode.IsValid() {
-			return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
-		}
-	*/
-
-	kcoin.blockchain, err = types.NewBlockChain(chainDb, cacheConfig, kcoin.chainConfig, service.engine, vmConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return service, nil
+	return &Service{}, nil
 }

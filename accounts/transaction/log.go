@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package transaction
 
 import (
+	"crypto"
 	"io"
 
+	"github.com/kowala-tech/equilibrium/accounts"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
@@ -28,9 +30,9 @@ import (
 type Log struct {
 	// Consensus fields:
 	// address of the contract that generated the event
-	ContractAddress Address `json:"address" gencodec:"required"`
+	ContractAddress accounts.Address `json:"address" gencodec:"required"`
 	// list of topics provided by the contract.
-	Topics []Hash `json:"topics" gencodec:"required"`
+	Topics []crypto.Hash `json:"topics" gencodec:"required"`
 	// supplied by the contract, usually ABI-encoded
 	Data []byte `json:"data" gencodec:"required"`
 
@@ -39,11 +41,11 @@ type Log struct {
 	// block in which the transaction was included
 	BlockNumber uint64 `json:"blockNumber"`
 	// hash of the transaction
-	TxHash Hash `json:"transactionHash" gencodec:"required"`
+	TxHash crypto.Hash `json:"transactionHash" gencodec:"required"`
 	// index of the transaction in the block
 	TxIndex uint `json:"transactionIndex" gencodec:"required"`
 	// hash of the block in which the transaction was included
-	BlockHash Hash `json:"blockHash"`
+	BlockHash crypto.Hash `json:"blockHash"`
 	// index of the log in the receipt
 	Index uint `json:"logIndex" gencodec:"required"`
 
@@ -60,19 +62,19 @@ type logMarshaling struct {
 }
 
 type rlpLog struct {
-	ContractAddress Address
-	Topics          []Hash
+	ContractAddress accounts.Address
+	Topics          []crypto.Hash
 	Data            []byte
 }
 
 type rlpStorageLog struct {
-	ContractAddress Address
-	Topics          []Hash
+	ContractAddress accounts.Address
+	Topics          []crypto.Hash
 	Data            []byte
 	BlockNumber     uint64
-	TxHash          Hash
+	TxHash          crypto.Hash
 	TxIndex         uint
-	BlockHash       Hash
+	BlockHash       crypto.Hash
 	Index           uint
 }
 

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"crypto"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
@@ -12,10 +13,9 @@ import (
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/database"
+	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/params"
-	"github.com/kowala-tech/equilibrium/services/archive/types/rawdb"
-	"github.com/kowala-tech/equilibrium/types"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
@@ -243,7 +243,7 @@ func (hc *HeaderChain) InsertHeaderChain(chain []*Header, writeHeader WhCallback
 
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given
 // hash, fetching towards the genesis block.
-func (hc *HeaderChain) GetBlockHashesFromHash(hash types.Hash, max uint64) []types.Hash {
+func (hc *HeaderChain) GetBlockHashesFromHash(hash crypto.Hash, max uint64) []crypto.Hash {
 	// Get the origin header from which to fetch
 	header := hc.GetHeaderByHash(hash)
 	if header == nil {
@@ -269,16 +269,16 @@ func (hc *HeaderChain) GetBlockHashesFromHash(hash types.Hash, max uint64) []typ
 // number of blocks to be individually checked before we reach the canonical chain.
 //
 // Note: ancestor == 0 returns the same block, 1 returns its parent and so on.
-func (hc *HeaderChain) GetAncestor(hash types.Hash, number, ancestor uint64, maxNonCanonical *uint64) (types.Hash, uint64) {
+func (hc *HeaderChain) GetAncestor(hash crypto.Hash, number, ancestor uint64, maxNonCanonical *uint64) (crypto.Hash, uint64) {
 	if ancestor > number {
-		return types.Hash{}, 0
+		return crypto.Hash{}, 0
 	}
 	if ancestor == 1 {
 		// in this case it is cheaper to just read the header
 		if header := hc.GetHeader(hash, number); header != nil {
 			return header.ParentHash, number - 1
 		} else {
-			return types.Hash{}, 0
+			return crypto.Hash{}, 0
 		}
 	}
 	for ancestor != 0 {
@@ -287,13 +287,13 @@ func (hc *HeaderChain) GetAncestor(hash types.Hash, number, ancestor uint64, max
 			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
 		}
 		if *maxNonCanonical == 0 {
-			return types.Hash{}, 0
+			return crypto.Hash{}, 0
 		}
 		*maxNonCanonical--
 		ancestor--
 		header := hc.GetHeader(hash, number)
 		if header == nil {
-			return types.Hash{}, 0
+			return crypto.Hash{}, 0
 		}
 		hash = header.ParentHash
 		number--
@@ -303,13 +303,13 @@ func (hc *HeaderChain) GetAncestor(hash types.Hash, number, ancestor uint64, max
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (hc *HeaderChain) GetHeader(hash types.Hash, number uint64) *types.Header {
+func (hc *HeaderChain) GetHeader(hash crypto.Hash, number uint64) *Header {
 	return hc.store.GetHeader(hash, Number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (hc *HeaderChain) GetHeaderByHash(hash types.Hash) *Header {
+func (hc *HeaderChain) GetHeaderByHash(hash crypto.Hash) *Header {
 	number := hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -318,7 +318,7 @@ func (hc *HeaderChain) GetHeaderByHash(hash types.Hash) *Header {
 }
 
 // HasHeader checks if a block header is present in the database or not.
-func (hc *HeaderChain) HasHeader(hash types.Hash, number uint64) bool {
+func (hc *HeaderChain) HasHeader(hash crypto.Hash, number uint64) bool {
 	hc.store.HasHeader(hash, number)
 }
 
@@ -334,12 +334,12 @@ func (hc *HeaderChain) GetHeaderByNumber(number uint64) *Header {
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
-func (hc *HeaderChain) CurrentHeader() *types.Header {
-	return hc.currentHeader.Load().(*types.Header)
+func (hc *HeaderChain) CurrentHeader() *Header {
+	return hc.currentHeader.Load().(*Header)
 }
 
 // SetCurrentHeader sets the current head header of the canonical chain.
-func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
+func (hc *HeaderChain) SetCurrentHeader(head *Header) {
 	rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash())
 
 	hc.currentHeader.Store(head)
@@ -348,7 +348,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 
 // DeleteCallback is a callback function that is called by RewindTo before
 // each header is deleted.
-type DeleteCallback func(rawdb.DatabaseDeleter, types.Hash, uint64)
+type DeleteCallback func(rawdb.DatabaseDeleter, crypto.Hash, uint64)
 
 // RewindTorewinds the local chain to a new head. Everything above the new head
 // will be deleted and the new one set.
@@ -387,7 +387,7 @@ func (hc *HeaderChain) RewindTo(head uint64, delFn DeleteCallback) {
 }
 
 // SetGenesis sets a new genesis block header for the chain
-func (hc *HeaderChain) SetGenesis(head *types.Header) {
+func (hc *HeaderChain) SetGenesis(head *Header) {
 	hc.genesisHeader = head
 }
 
@@ -399,6 +399,6 @@ func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }
 
 // GetBlock implements consensus.ChainReader, and returns nil for every input as
 // a header chain does not have blocks available for retrieval.
-func (hc *HeaderChain) GetBlock(hash types.Hash, number uint64) *Block {
+func (hc *HeaderChain) GetBlock(hash crypto.Hash, number uint64) *Block {
 	return nil
 }

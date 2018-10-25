@@ -3,8 +3,8 @@ package types
 import (
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/kowala-tech/equilibrium/database"
+	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
-	"github.com/kowala-tech/equilibrium/services/archive/types/rawdb"
 	"github.com/kowala-tech/equilibrium/types"
 )
 

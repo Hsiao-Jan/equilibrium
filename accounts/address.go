@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package types
+package accounts
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -26,7 +27,9 @@ import (
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/crypto/sha3"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
 const AddressLength = 20
@@ -68,7 +71,7 @@ func (a Address) Bytes() []byte { return a[:] }
 func (a Address) Big() *big.Int { return new(big.Int).SetBytes(a[:]) }
 
 // Hash converts an address to a hash by left-padding it with zeros.
-func (a Address) Hash() Hash { return BytesToHash(a[:]) }
+func (a Address) Hash() crypto.Hash { return crypto.BytesToHash(a[:]) }
 
 // Hex returns an EIP55-compliant hex string representation of the address.
 func (a Address) Hex() string {
@@ -198,4 +201,21 @@ func (ma *MixedcaseAddress) ValidChecksum() bool {
 // Original returns the mixed-case input string
 func (ma *MixedcaseAddress) Original() string {
 	return ma.original
+}
+
+// CreateAddress creates an ethereum address given the bytes and the nonce
+func CreateAddress(b Address, nonce uint64) Address {
+	data, _ := rlp.EncodeToBytes([]interface{}{b, nonce})
+	return BytesToAddress(crypto.Keccak256(data)[12:])
+}
+
+// CreateAddress2 creates an ethereum address given the address bytes, initial
+// contract code and a salt.
+func CreateAddress2(b Address, salt [32]byte, code []byte) Address {
+	return BytesToAddress(crypto.Keccak256([]byte{0xff}, b.Bytes(), salt[:], crypto.Keccak256(code))[12:])
+}
+
+func PubkeyToAddress(p ecdsa.PublicKey) Address {
+	pubBytes := crypto.FromECDSAPub(&p)
+	return BytesToAddress(crypto.Keccak256(pubBytes[1:])[12:])
 }

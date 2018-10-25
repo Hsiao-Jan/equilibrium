@@ -146,13 +146,6 @@ func NewBlock(header *Header, txs []*Transaction, receipts []*Receipt, lastCommi
 	return block, nil
 }
 
-type writeCounter StorageSize
-
-func (c *writeCounter) Write(b []byte) (int, error) {
-	*c += writeCounter(len(b))
-	return len(b), nil
-}
-
 // Size returns the true RLP encoded storage size of the block, either by encoding
 // and returning it, or returning a previsouly cached value.
 func (b *Block) Size() StorageSize {

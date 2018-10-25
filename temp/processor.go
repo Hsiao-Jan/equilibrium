@@ -1,16 +1,6 @@
 package types
 
-import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/consensus"
-	"github.com/kowala-tech/kcoin/client/core/state"
-	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/core/vm"
-	"github.com/kowala-tech/kcoin/client/crypto"
-	"github.com/kowala-tech/kcoin/client/log"
-	"github.com/kowala-tech/kcoin/client/params"
-)
+/*
 
 // Processor is a basic Processor, which takes care of transitioning
 // state from one point to another.
@@ -75,7 +65,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, computational resource used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, crpool *ComputationalResourcePool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, cfg vm.Config) (*types.Receipt, uint64, error) {
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *types.Address, crpool *ComputationalResourcePool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, cfg vm.Config) (*types.Receipt, uint64, error) {
 	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
 	if err != nil {
 		return nil, 0, err
@@ -111,3 +101,4 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 
 	return receipt, effort, err
 }
+*/

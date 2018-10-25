@@ -14,31 +14,27 @@
 
 package types
 
-import (
-	"crypto/ecdsa"
-	"errors"
-	"fmt"
-	"math/big"
-
-	"github.com/kowala-tech/equilibrium/common"
-	"github.com/kowala-tech/equilibrium/crypto"
-	miningtypes "github.com/kowala-tech/equilibrium/services/mining/types"
-	"github.com/kowala-tech/equilibrium/types"
-)
-
+/*
 var (
-	errInvalidSig     = errors.New("invalid v, r, s values")
-	errInvalidChainID = errors.New("invalid chain id for signer")
+	// ErrInvalidSig signals invalid signature signature values.
+	ErrInvalidSig = errors.New("invalid v, r, s values")
+
+	// ErrInvalidChainID signals an invalid chain id.
+	ErrInvalidChainID = errors.New("invalid chain id for signer")
 )
 
-// @TODO (rgeraldes) - is equal necessary?
-// @TODO (rgeraldes) - review comments
-
+// Hasher represents a type capable of creating an hash.
 type Hasher interface {
-	HashWithData(data ...interface{}) types.Hash
+	HashWithData(data ...interface{}) Hash
 }
 
-type Sender interface {
+// SignableType interface {
+type SignableType interface {
+	WithSignature()
+}
+
+// SignableType is a type whose integrity cannot be compromised without being detected.
+type SignableType interface {
 	Hasher
 	Protected() bool
 	ChainID() *big.Int
@@ -48,18 +44,18 @@ type Sender interface {
 // Signer encapsulates the signature handling.
 type Signer interface {
 	// Sender returns the sender address of the transaction.
-	Sender(s Sender) (types.Address, error)
+	Sender(typ SignedType) (accounts.Address, error)
 	// SignatureValues returns the raw R, S, V values corresponding to the
 	// given signature.
 	SignatureValues(sig []byte) (r, s, v *big.Int, err error)
 	// Hash returns the hash to be signed.
-	Hash(h Hasher) types.Hash
+	Hash(h Hasher) Hash
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
 }
 
 // MakeSigner returns a Signer based on the given chain config and block number.
-func MakeSigner( /*cfg *params.ChainConfig, blockNumber *big.Int*/ ) Signer {
+func MakeSigner( cfg *params.ChainConfig, blockNumber *big.Int ) Signer {
 	return NewProductionSigner(cfg.ChainID)
 }
 
@@ -88,12 +84,12 @@ func (s ProductionSigner) Equal(s2 Signer) bool {
 	return ok && andromeda.chainID.Cmp(s.chainID) == 0
 }
 
-func (s ProductionSigner) Sender(sn Sender) (types.Address, error) {
+func (s ProductionSigner) Sender(sn Sender) (accounts.Address, error) {
 	if !sn.Protected() {
 		return UnsafeSigner{}.Sender(sn)
 	}
 	if sn.ChainID().Cmp(s.chainID) != 0 {
-		return Address{}, errInvalidChainID
+		return accounts.Address{}, errInvalidChainID
 	}
 
 	snR, snS, snV := sn.SignatureValues()
@@ -142,7 +138,7 @@ func (s UnsafeSigner) SignatureValues(sig []byte) (sr, ss, sv *big.Int, err erro
 	return
 }
 
-func (s UnsafeSigner) Sender(sn Sender) (types.Address, error) {
+func (s UnsafeSigner) Sender(sn Sender) (accounts.Address, error) {
 	snR, snS, snV := sn.SignatureValues()
 	return recoverPlain(s.Hash(sn), snR, snS, snV, true)
 }
@@ -151,12 +147,12 @@ func (s UnsafeSigner) Hash(h Hasher) Hash {
 	return h.HashWithData()
 }
 
-func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (types.Address, error) {
+func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (accounts.Address, error) {
 	if Vb.BitLen() > 8 {
 		return Address{}, errInvalidSig
 	}
 	V := byte(Vb.Uint64() - 27)
-	if !crypto.ValidateSignatureValues(V, R, S, homestead) {
+	if !ValidateSignatureValues(V, R, S, homestead) {
 		return Address{}, errInvalidSig
 	}
 	// encode the snature in uncompressed format
@@ -166,7 +162,7 @@ func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (types.Addres
 	copy(sig[64-len(s):64], s)
 	sig[64] = V
 	// recover the public key from the signature
-	pub, err := crypto.Ecrecover(sighash[:], sig)
+	pub, err := Ecrecover(sighash[:], sig)
 	if err != nil {
 		return Address{}, err
 	}
@@ -174,39 +170,8 @@ func recoverPlain(sighash Hash, R, S, Vb *big.Int, homestead bool) (types.Addres
 		return Address{}, errors.New("invalid public key")
 	}
 	var addr Address
-	copy(addr[:], crypto.Keccak256(pub[1:])[12:])
+	copy(addr[:], Keccak256(pub[1:])[12:])
 	return addr, nil
-}
-
-// SignTx signs the transaction using the given signer and private key
-func SignTx(tx *Transaction, signer Signer, prv *ecdsa.PrivateKey) (*types.Transaction, error) {
-	h := signer.Hash(tx)
-	sig, err := crypto.Sign(h.Bytes(), prv)
-	if err != nil {
-		return nil, err
-	}
-	return tx.WithSignature(signer, sig)
-}
-
-// SignProposal signs the proposal using the given signer and private key
-func SignProposal(proposal *Proposal, signer Signer, prv *ecdsa.PrivateKey) (*miningtypes.Proposal, error) {
-	h := signer.Hash(proposal)
-	sig, err := crypto.Sign(h[:], prv)
-	if err != nil {
-		return nil, err
-	}
-	return proposal.WithSignature(signer, sig)
-
-}
-
-// SignVote signs the vote using the given signer and private key
-func SignVote(vote *Vote, signer Signer, prv *ecdsa.PrivateKey) (*miningtypes.Vote, error) {
-	h := signer.Hash(vote)
-	sig, err := crypto.Sign(h[:], prv)
-	if err != nil {
-		return nil, err
-	}
-	return vote.WithSignature(signer, sig)
 }
 
 // sigCache is used to cache the derived sender and contains
@@ -272,3 +237,4 @@ func VoteSender(signer Signer, vote *Vote) (types.Address, error) {
 	vote.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
 }
+*/

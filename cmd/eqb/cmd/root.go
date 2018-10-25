@@ -26,6 +26,7 @@ import (
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/p2p"
 	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/services/archive"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
@@ -155,8 +156,7 @@ func makeNode() *node.Node {
 		log.Fatal("Failed to create the node", zap.Error(err))
 	}
 
-	//RegisterArchiveService(node)
-	//RegisterMiningService(node)
+	//includeServices(node)
 
 	return node
 }
@@ -224,8 +224,12 @@ func startNode(stack *node.Node) {
 	}()
 }
 
-/*
-func RegisterArchiveService(stack *node.Node) {
+func registerServices(stack *node.Node) {
+	registerArchiveService(node)
+	//registerMiningService(node)
+}
+
+func registerArchiveService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return archive.New(ctx)
 	}); err != nil {
@@ -233,6 +237,7 @@ func RegisterArchiveService(stack *node.Node) {
 	}
 }
 
+/*
 
 func RegisterMiningService(stack *node.Node) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {

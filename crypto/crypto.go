@@ -28,10 +28,9 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/math"
-	"github.com/kowala-tech/kcoin/client/crypto/sha3"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/math"
+	"github.com/kowala-tech/equilibrium/crypto/sha3"
 )
 
 var (
@@ -52,7 +51,7 @@ func Keccak256(data ...[]byte) []byte {
 
 // Keccak256Hash calculates and returns the Keccak256 hash of the input data,
 // converting it to an internal Hash data structure.
-func Keccak256Hash(data ...[]byte) (h common.Hash) {
+func Keccak256Hash(data ...[]byte) (h Hash) {
 	d := sha3.NewKeccak256()
 	for _, b := range data {
 		d.Write(b)
@@ -68,18 +67,6 @@ func Keccak512(data ...[]byte) []byte {
 		d.Write(b)
 	}
 	return d.Sum(nil)
-}
-
-// CreateAddress creates an ethereum address given the bytes and the nonce
-func CreateAddress(b common.Address, nonce uint64) common.Address {
-	data, _ := rlp.EncodeToBytes([]interface{}{b, nonce})
-	return common.BytesToAddress(Keccak256(data)[12:])
-}
-
-// CreateAddress2 creates an ethereum address given the address bytes, initial
-// contract code and a salt.
-func CreateAddress2(b common.Address, salt [32]byte, code []byte) common.Address {
-	return common.BytesToAddress(Keccak256([]byte{0xff}, b.Bytes(), salt[:], Keccak256(code))[12:])
 }
 
 // ToECDSA creates a private key with the given D value.
@@ -198,11 +185,6 @@ func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
 	}
 	// Frontier: allow s to be in full N range
 	return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1N) < 0 && (v == 0 || v == 1)
-}
-
-func PubkeyToAddress(p ecdsa.PublicKey) common.Address {
-	pubBytes := FromECDSAPub(&p)
-	return common.BytesToAddress(Keccak256(pubBytes[1:])[12:])
 }
 
 func zeroBytes(bytes []byte) {

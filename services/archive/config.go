@@ -60,6 +60,4 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
-
-	Currency string
 }
