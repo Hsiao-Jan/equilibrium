@@ -25,9 +25,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/equilibrium/node/event"
+	"github.com/kowala-tech/equilibrium/node/p2p"
+	srvc "github.com/kowala-tech/equilibrium/node/services"
 	"github.com/prometheus/prometheus/util/flock"
 	"go.uber.org/zap"
 )
@@ -78,8 +79,8 @@ type Node struct {
 	eventMux *event.TypeMux
 	//accountMgr *accounts.Manager
 
-	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
-	services     map[reflect.Type]Service // Currently running services
+	serviceFuncs []srvc.Constructor            // Service constructors (in dependency order)
+	services     map[reflect.Type]srvc.Service // Currently running services
 
 	dirLock flock.Releaser // prevents concurrent use of instance directory
 
@@ -120,7 +121,7 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 
 	return &Node{
 		cfg:          cfg,
-		serviceFuncs: []ServiceConstructor{},
+		serviceFuncs: []srvc.Constructor{},
 		//engine:       konsensus.New(),
 		eventMux: new(event.TypeMux),
 		//accountMgr: accountMgr,
@@ -129,7 +130,7 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 
 // Register injects a new service into the node's stack. The service created by
 // the passed constructor must be unique in its type with regard to sibling ones.
-func (n *Node) Register(constructor ServiceConstructor) error {
+func (n *Node) Register(constructor srvc.Constructor) error {
 	n.nodeMu.Lock()
 	defer n.nodeMu.Unlock()
 
@@ -161,17 +162,17 @@ func (n *Node) Start() error {
 	//log.Info("Starting p2p node", zap.String("instance", n.hostCfg.Name))
 
 	// Otherwise copy and specialize the P2P configuration
-	services := make(map[reflect.Type]Service)
+	services := make(map[reflect.Type]srvc.Service)
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service
-		ctx := &ServiceContext{
-			cfg:      n.cfg,
-			services: make(map[reflect.Type]Service),
+		ctx := &srvc.Context{
+			//cfg:      n.cfg,
+			Services: make(map[reflect.Type]srvc.Service),
 			//AccountManager: n.accountMgr,
 			EventMux: n.eventMux,
 		}
 		for kind, s := range services { // copy needed for threaded access
-			ctx.services[kind] = s
+			ctx.Services[kind] = s
 		}
 		// Construct and save the service
 		service, err := constructor(ctx)

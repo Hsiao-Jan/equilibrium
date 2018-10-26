@@ -19,7 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/equilibrium/node/p2p"
 )
 
 var DefaultConfig = Config{

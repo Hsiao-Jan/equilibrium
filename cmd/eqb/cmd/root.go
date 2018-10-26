@@ -24,9 +24,9 @@ import (
 
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/node"
-	"github.com/kowala-tech/equilibrium/p2p"
+	"github.com/kowala-tech/equilibrium/node/p2p"
+	"github.com/kowala-tech/equilibrium/node/services/archive"
 	"github.com/kowala-tech/equilibrium/params"
-	"github.com/kowala-tech/equilibrium/services/archive"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
