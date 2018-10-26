@@ -15,11 +15,11 @@
 package transaction
 
 import (
-	"crypto"
 	"io"
 
 	"github.com/kowala-tech/equilibrium/accounts"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 

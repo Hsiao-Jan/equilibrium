@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	mrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +37,7 @@ import (
 	"github.com/kowala-tech/equilibrium/params"
 	"github.com/kowala-tech/equilibrium/state"
 	"github.com/kowala-tech/equilibrium/trie"
+	"github.com/kowala-tech/equilibrium/types"
 	"github.com/kowala-tech/equilibrium/vm"
 	"github.com/kowala-tech/kcoin/client/consensus"
 	"go.uber.org/zap"
@@ -73,7 +73,6 @@ type ChainEvent struct {
 
 // ChainHeadEvent
 type ChainHeadEvent struct{ Block *Block }
-
 
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
@@ -118,7 +117,7 @@ type BlockChain struct {
 
 	// interrupt must be atomically called
 	interrupt int32          // interrupt signaler for block processing
-	wg            sync.WaitGroup // chain processing wait group for shutting down
+	wg        sync.WaitGroup // chain processing wait group for shutting down
 
 	engine    consensus.Engine
 	processor Processor // block processor interface
@@ -143,21 +142,21 @@ func New(db database.Database, cacheConfig *CacheConfig, chainConfig *params.Cha
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
-		chainConfig:  chainConfig,
-		cacheConfig:  cacheConfig,
-		db:           db,
-		triegc:       prque.New(),
-		stateCache:   state.NewDatabase(db),
-		engine:       engine,
-		vmConfig:     vmConfig,
-		badBlocks:    badBlocks,
-		doneCh:       make(chan struct{}),
+		chainConfig: chainConfig,
+		cacheConfig: cacheConfig,
+		db:          db,
+		triegc:      prque.New(),
+		stateCache:  state.NewDatabase(db),
+		engine:      engine,
+		vmConfig:    vmConfig,
+		badBlocks:   badBlocks,
+		doneCh:      make(chan struct{}),
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
 	bc.SetProcessor(NewStateProcessor(chainConfig, bc, engine))
 
 	var err error
-	store := NewCache(NewDatabase(bc.db, bc.hc)
+	store := NewCache(NewDatabase(bc.db, bc.hc))
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
 	if err != nil {
 		return nil, err
@@ -841,7 +840,7 @@ func (bc *BlockChain) WriteBlockWithState(block *Block, receipts []*transaction.
 	bc.insert(block)
 
 	bc.futureBlocks.Remove(block.Hash())
-	
+
 	return nil
 }
 
@@ -863,7 +862,7 @@ func writePositionalMetadata(batch database.Batch, block *Block, state *state.St
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
-// chain. If an error is returned it will return the index number of the failing 
+// chain. If an error is returned it will return the index number of the failing
 // block as well an error describing what went wrong.
 //
 // After insertion is done, all accumulated events will be fired.
@@ -1021,7 +1020,6 @@ func (bc *BlockChain) insertChain(chain Blocks) (int, []interface{}, []*transact
 		lastCanon = block
 
 		bc.gcproc += proctime
-		
 
 		stats.processed++
 		stats.usedGas += usedGas

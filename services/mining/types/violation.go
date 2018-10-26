@@ -18,23 +18,25 @@ import (
 	"math/big"
 	"reflect"
 
+	"github.com/kowala-tech/equilibrium/accounts"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 )
 
 var _ Evidence = (*DuplicateVoting)(nil)
 
 // Evidence is the information that is used to decide the case.
 type Evidence interface {
-	Hash() Hash
-	FactFinder(signer Signer) (Address, error)
+	Hash() crypto.Hash
+	FactFinder(signer crypto.Signer) (accounts.Address, error)
 }
 
 // Conviction is the verdict that results when a validator
 // finds other validator guilty of protocol violation.
 type Conviction struct {
-	blockNumber *big.Int `json:"blockNumber" gencodec:"required"`
-	perpetrator Address  `json:"perpetrator" gencodec:"required"`
-	evidence    Evidence `json:"evidence"    gencodec:"required"`
+	blockNumber *big.Int         `json:"blockNumber" gencodec:"required"`
+	perpetrator accounts.Address `json:"perpetrator" gencodec:"required"`
+	evidence    Evidence         `json:"evidence"    gencodec:"required"`
 }
 
 // convictionMarshaling field type overrides for gencodec.
@@ -46,7 +48,7 @@ type convictionMarshaling struct {
 func (c *Conviction) Category() string { return reflect.TypeOf(c.evidence).Name() }
 
 // Perpetrator returns the conviction perpetrator.
-func (c *Conviction) Perpetrator() Address { return c.perpetrator }
+func (c *Conviction) Perpetrator() accounts.Address { return c.perpetrator }
 
 // Evidence returns the conviction evidence.
 func (c *Conviction) Evidence() Evidence { return c.evidence }
@@ -62,11 +64,11 @@ type DuplicateVoting struct {
 }
 
 // Hash returns DuplicateVoting hash.
-func (dv *DuplicateVoting) Hash() Hash {
-	return rlpHash(dv)
+func (dv *DuplicateVoting) Hash() crypto.Hash {
+	return crypto.RLPHash(dv)
 }
 
 // FactFinder returns the validator responsible for gathering the facts.
-func (dv *DuplicateVoting) FactFinder(signer Signer) (Address, error) {
-	return Address{}, nil
+func (dv *DuplicateVoting) FactFinder(signer crypto.Signer) (accounts.Address, error) {
+	return accounts.Address{}, nil
 }

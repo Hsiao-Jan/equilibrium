@@ -21,9 +21,11 @@ import (
 	"math/big"
 	"unsafe"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/common/hexutil"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
 //go:generate gencodec -type Receipt -field-override receiptMarshaling -out gen_receipt_json.go
@@ -43,16 +45,16 @@ const (
 
 // Receipt contains the results of a transaction.
 type Receipt struct {
-	PostState    []byte   `json:"postState"`
-	Status       uint64   `json:"status"`
-	Bloom        Bloom    `json:"logsBloom"                     gencodec:"required"`
-	Logs         []*Log   `json:"logs"                          gencodec:"required"`
-	ComputeFee   *big.Int `json:"computeFee"                    gencodec:"required"`
-	StabilityFee *big.Int `json:"stabilityFee"                  gencodec:"required"`
+	PostState    []byte       `json:"postState"`
+	Status       uint64       `json:"status"`
+	Bloom        common.Bloom `json:"logsBloom"                     gencodec:"required"`
+	Logs         []*Log       `json:"logs"                          gencodec:"required"`
+	ComputeFee   *big.Int     `json:"computeFee"                    gencodec:"required"`
+	StabilityFee *big.Int     `json:"stabilityFee"                  gencodec:"required"`
 
 	// Derived fields
-	TxHash          common.Hash    `json:"transactionHash"  gencodec:"required"`
-	ContractAddress common.Address `json:"contractAddress"`
+	TxHash          crypto.Hash      `json:"transactionHash"  gencodec:"required"`
+	ContractAddress accounts.Address `json:"contractAddress"`
 }
 
 type receiptMarshaling struct {
@@ -65,7 +67,7 @@ type receiptMarshaling struct {
 // receiptRLP is the consensus encoding of a receipt.
 type receiptRLP struct {
 	PostStateOrStatus []byte
-	Bloom             Bloom
+	Bloom             common.Bloom
 	Logs              []*Log
 	ComputeFee        *big.Int
 	StabilityFee      *big.Int
@@ -73,9 +75,9 @@ type receiptRLP struct {
 
 type receiptStorageRLP struct {
 	PostStateOrStatus []byte
-	Bloom             Bloom
-	TxHash            common.Hash
-	ContractAddress   common.Address
+	Bloom             common.Bloom
+	TxHash            crypto.Hash
+	ContractAddress   accounts.Address
 	Logs              []*LogForStorage
 	ComputeFee        *big.Int
 	StabilityFee      *big.Int
@@ -122,7 +124,7 @@ func (r *Receipt) setStatus(postStateOrStatus []byte) error {
 		r.Status = ReceiptStatusSuccessful
 	case bytes.Equal(postStateOrStatus, receiptStatusFailedRLP):
 		r.Status = ReceiptStatusFailed
-	case len(postStateOrStatus) == len(common.Hash{}):
+	case len(postStateOrStatus) == len(crypto.Hash{}):
 		r.PostState = postStateOrStatus
 	default:
 		return fmt.Errorf("invalid receipt status %x", postStateOrStatus)
@@ -147,7 +149,7 @@ func (r *Receipt) Size() common.StorageSize {
 
 	size += common.StorageSize(len(r.Logs)) * common.StorageSize(unsafe.Sizeof(Log{}))
 	for _, log := range r.Logs {
-		size += common.StorageSize(len(log.Topics)*common.HashLength + len(log.Data))
+		size += common.StorageSize(len(log.Topics)*crypto.HashLength + len(log.Data))
 	}
 	return size
 }

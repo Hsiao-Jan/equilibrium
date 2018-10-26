@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package transaction
+package common
 
 import (
 	"fmt"
 	"math/big"
 
-	"github.com/kowala-tech/equilibrium/common/hexutil"
-	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/kcoin/client/common/hexutil"
+	"github.com/kowala-tech/kcoin/client/crypto"
 )
 
 type bytesBacked interface {
@@ -89,27 +89,6 @@ func (b Bloom) MarshalText() ([]byte, error) {
 // UnmarshalText b as a hex string with 0x prefix.
 func (b *Bloom) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("Bloom", input, b[:])
-}
-
-func CreateBloom(receipts Receipts) Bloom {
-	bin := new(big.Int)
-	for _, receipt := range receipts {
-		bin.Or(bin, LogsBloom(receipt.Logs))
-	}
-
-	return BytesToBloom(bin.Bytes())
-}
-
-func LogsBloom(logs []*Log) *big.Int {
-	bin := new(big.Int)
-	for _, log := range logs {
-		bin.Or(bin, bloom9(log.ContractAddress.Bytes()))
-		for _, b := range log.Topics {
-			bin.Or(bin, bloom9(b[:]))
-		}
-	}
-
-	return bin
 }
 
 func bloom9(b []byte) *big.Int {

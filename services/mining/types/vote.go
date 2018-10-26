@@ -15,12 +15,18 @@
 package types
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"sync"
 	"sync/atomic"
 
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
@@ -57,7 +63,7 @@ type voteData struct {
 	Type VoteType `json:"type" gencodec:"required"`
 
 	// Decision represents an individual's choice for or against some block.
-	Decision Hash `json:"blockHash" gencodec:"required"`
+	Decision crypto.Hash `json:"blockHash" gencodec:"required"`
 
 	// Signature values.
 	V *big.Int `json:"v"   gencodec:"required"`
@@ -74,11 +80,11 @@ type voteDataMarshaling struct {
 	S           *hexutil.Big
 }
 
-func NewVote(blockNumber *big.Int, round uint64, decision Hash, voteType VoteType) *Vote {
+func NewVote(blockNumber *big.Int, round uint64, decision crypto.Hash, voteType VoteType) *Vote {
 	return newVote(blockNumber, round, decision, voteType)
 }
 
-func newVote(blockNumber *big.Int, round uint64, decision Hash, voteType VoteType) *Vote {
+func newVote(blockNumber *big.Int, round uint64, decision crypto.Hash, voteType VoteType) *Vote {
 	d := voteData{
 		BlockNumber: new(big.Int),
 		Round:       round,
@@ -106,7 +112,7 @@ func (vote *Vote) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
 	err := s.Decode(&vote.data)
 	if err == nil {
-		vote.size.Store(StorageSize(rlp.ListSize(size)))
+		vote.size.Store(common.StorageSize(rlp.ListSize(size)))
 	}
 
 	return err
@@ -116,7 +122,7 @@ func (vote *Vote) DecodeRLP(s *rlp.Stream) error {
 func (vote *Vote) BlockNumber() *big.Int { return vote.data.BlockNumber }
 
 // Decision returns the individual's choice.
-func (vote *Vote) Decision() Hash { return vote.data.Decision }
+func (vote *Vote) Decision() crypto.Hash { return vote.data.Decision }
 
 // Round returns the respective consensus round.
 func (vote *Vote) Round() uint64 { return vote.data.Round }
@@ -126,39 +132,39 @@ func (vote *Vote) Type() VoteType { return vote.data.Type }
 
 // Size returns the true RLP encoded storage size of the vote, either by
 // encoding and returning it, or returning a previsouly cached value.
-func (vote *Vote) Size() StorageSize {
+func (vote *Vote) Size() common.StorageSize {
 	if size := vote.size.Load(); size != nil {
-		return size.(StorageSize)
+		return size.(common.StorageSize)
 	}
-	c := writeCounter(0)
+	c := common.WriteCounter(0)
 	rlp.Encode(&c, &vote.data)
-	vote.size.Store(StorageSize(c))
-	return StorageSize(c)
+	vote.size.Store(common.StorageSize(c))
+	return common.StorageSize(c)
 }
 
 // Hash hashes the RLP encoding of the vote. It uniquely identifies the vote.
-func (vote *Vote) Hash() Hash {
+func (vote *Vote) Hash() crypto.Hash {
 	if hash := vote.hash.Load(); hash != nil {
-		return hash.(Hash)
+		return hash.(crypto.Hash)
 	}
-	v := rlpHash(vote)
+	v := crypto.RLPHash(vote)
 	vote.hash.Store(v)
 	return v
 }
 
 // HashWithData returns the vote hash to be signed by the sender.
-func (vote *Vote) HashWithData(data ...interface{}) Hash {
+func (vote *Vote) HashWithData(data ...interface{}) crypto.Hash {
 	voteData := []interface{}{
 		vote.data.BlockNumber,
 		vote.data.Round,
 		vote.data.Type,
 		vote.data.Decision,
 	}
-	return rlpHash(append(voteData, data...))
+	return crypto.RLPHash(append(voteData, data...))
 }
 
 // WithSignature returns a new vote with the given signature.
-func (vote *Vote) WithSignature(signer Signer, sig []byte) (*Vote, error) {
+func (vote *Vote) WithSignature(signer crypto.Signer, sig []byte) (*Vote, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err
@@ -174,11 +180,12 @@ func (vote *Vote) WithSignature(signer Signer, sig []byte) (*Vote, error) {
 func (vote *Vote) Protected() bool { return true }
 
 // ChainID derives the vote chain ID from the signature.
-func (vote *Vote) ChainID() *big.Int { return deriveChainID(vote.data.V) }
+func (vote *Vote) ChainID() *big.Int { return common.DeriveChainID(vote.data.V) }
 
 // SignatureValues returns the vote raw signature values.
 func (vote *Vote) SignatureValues() (R, S, V *big.Int) {
 	R, S, V = vote.data.R, vote.data.S, vote.data.V
+	return
 }
 
 // String presents the vote values.
@@ -209,3 +216,140 @@ func (vote *Vote) String() string {
 
 // Votes represents a slice of votes.
 type Votes []*Vote
+
+// AddressVote is a wrapper type that includes the address.
+type AddressVote interface {
+	Address() accounts.Address
+	Vote() *Vote
+}
+
+type addressVote struct {
+	vote    *Vote
+	address accounts.Address
+}
+
+// NewAddressVote derives the sender and includes it in the AddressVote with the vote.
+func NewAddressVote(signer crypto.Signer, vote *Vote) (*addressVote, error) {
+	address, err := VoteSender(signer, vote)
+	if err != nil {
+		return nil, err
+	}
+
+	return &addressVote{
+		vote,
+		address,
+	}, nil
+}
+
+func (addressVote *addressVote) Address() accounts.Address {
+	return addressVote.address
+}
+
+func (addressVote *addressVote) Vote() *Vote {
+	return addressVote.vote
+}
+
+// @TODO - review
+
+type VotesSet struct {
+	m        map[crypto.Hash]*Vote // non-nil votes
+	nilVotes map[crypto.Hash]*Vote // nil votes
+	counter  map[crypto.Hash]int   // map[block.Hash]count
+	leader   crypto.Hash           // block.Hash
+	l        sync.RWMutex
+}
+
+func NewVotesSet() *VotesSet {
+	return &VotesSet{
+		m:        make(map[crypto.Hash]*Vote),
+		nilVotes: make(map[crypto.Hash]*Vote),
+		counter:  make(map[crypto.Hash]int),
+	}
+}
+
+func (v *VotesSet) Add(vote *Vote) {
+	v.l.Lock()
+	defer v.l.Unlock()
+
+	if bytes.Equal(vote.data.Decision.Bytes(), crypto.Hash{}.Bytes()) {
+		v.nilVotes[vote.Hash()] = vote
+		return
+	}
+
+	//log.Debug("voting. add vote", "type", vote.data.Type, "number", vote.data.BlockNumber.String(),
+	//	"round", vote.data.Round, "hash", vote.data.Decision.String())
+
+	v.m[vote.Hash()] = vote
+	v.counter[vote.data.Decision]++
+	if v.counter[vote.data.Decision] > v.counter[v.leader] {
+		v.leader = vote.data.Decision
+	}
+}
+
+var (
+	errNonNilDuplicate = errors.New("duplicate NON-NIL vote")
+	errNilDuplicate    = errors.New("duplicate NIL vote")
+)
+
+func (v *VotesSet) Contains(h crypto.Hash) error {
+	v.l.RLock()
+	defer v.l.RUnlock()
+
+	_, res := v.m[h]
+	if res {
+		return errNonNilDuplicate
+	}
+
+	if !res {
+		_, res = v.nilVotes[h]
+		if res {
+			return errNilDuplicate
+		}
+	}
+
+	return nil
+}
+
+func (v *VotesSet) Len() int {
+	v.l.RLock()
+	res := len(v.m)
+	v.l.RUnlock()
+	return res
+}
+
+func (v *VotesSet) Leader() crypto.Hash {
+	v.l.RLock()
+	res := v.leader
+	v.l.RUnlock()
+	return res
+}
+
+func (v *VotesSet) Get(h crypto.Hash) (*Vote, bool) {
+	v.l.RLock()
+	vote, ok := v.m[h]
+	v.l.RUnlock()
+	return vote, ok
+}
+
+func VoteSender(signer crypto.Signer, vote *Vote) (accounts.Address, error) {
+	// @TODO (rgeraldes)
+	/*
+		if sc := vote.from.Load(); sc != nil {
+			sigCache := sc.(sigCache)
+			// If the signer used to derive from in a previous
+			// call is not the same as used current, invalidate
+			// the cache.
+			if sigCache.signer.Equal(signer) {
+				return sigCache.from, nil
+			}
+		}
+
+		addr, err := signer.Sender(vote)
+		if err != nil {
+			return accounts.Address{}, err
+		}
+		vote.from.Store(sigCache{signer: signer, from: addr})
+		return addr, nil
+	*/
+	return accounts.Address{}, nil
+}

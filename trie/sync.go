@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/kowala-tech/equilibrium/common/prque"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/database"
+	"github.com/kowala-tech/kcoin/client/common"
 )
 
 // ErrNotRequested is returned by the trie sync when it's requested to process a
@@ -75,7 +75,7 @@ type Sync struct {
 	database DatabaseReader           // Persistent database to check for existing entries
 	membatch *syncMemBatch            // Memory buffer to avoid frequent database writes
 	requests map[crypto.Hash]*request // Pending requests pertaining to a key hash
-	queue    *prque.Prque             // Priority queue with the pending requests
+	queue    common.PriorityQueue     // Priority queue with the pending requests
 }
 
 // NewSync creates a new trie data download scheduler.
@@ -84,7 +84,7 @@ func NewSync(root crypto.Hash, database DatabaseReader, callback LeafCallback) *
 		database: database,
 		membatch: newSyncMemBatch(),
 		requests: make(map[crypto.Hash]*request),
-		queue:    prque.New(nil),
+		queue:    make(common.PriorityQueue, 0),
 	}
 	ts.AddSubTrie(root, 0, crypto.Hash{}, callback)
 	return ts
@@ -158,8 +158,9 @@ func (s *Sync) AddRawEntry(hash crypto.Hash, depth int, parent crypto.Hash) {
 // Missing retrieves the known missing nodes from the trie for retrieval.
 func (s *Sync) Missing(max int) []crypto.Hash {
 	requests := []crypto.Hash{}
-	for !s.queue.Empty() && (max == 0 || len(requests) < max) {
-		requests = append(requests, s.queue.PopItem().(crypto.Hash))
+	for !(s.queue.Len() == 0) && (max == 0 || len(requests) < max) {
+		item := s.queue.Pop().(common.Item)
+		requests = append(requests, item.Value.(crypto.Hash))
 	}
 	return requests
 }
@@ -242,7 +243,10 @@ func (s *Sync) schedule(req *request) {
 		return
 	}
 	// Schedule the request for future retrieval
-	s.queue.Push(req.hash, int64(req.depth))
+	s.queue.Push(common.Item{
+		Value:    req.hash,
+		Priority: req.depth,
+	})
 	s.requests[req.hash] = req
 }
 

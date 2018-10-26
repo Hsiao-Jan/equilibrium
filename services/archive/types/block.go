@@ -22,9 +22,13 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/accounts/transaction"
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/services/mining/types"
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -40,21 +44,21 @@ var (
 // Header represents a block header.
 type Header struct {
 	// basic info
-	Number            *big.Int `json:"number"            gencodec:"required"`
-	PreviousBlockHash Hash     `json:"previousBlockHash" gencodec:"required"`
-	Extra             []byte   `json:"extraData"         gencodec:"required"`
+	Number            *big.Int    `json:"number"            gencodec:"required"`
+	PreviousBlockHash crypto.Hash `json:"previousBlockHash" gencodec:"required"`
+	Extra             []byte      `json:"extraData"         gencodec:"required"`
 
 	// consensus
-	Snapshot Hash     `json:"stateRoot" gencodec:"required"`
-	Time     *big.Int `json:"timestamp" gencodec:"required"` // time is used to sync the validators upon a new consensus round.
-	Proposer Address  `json:"proposer"  gencodec:"required"`
+	Snapshot crypto.Hash      `json:"stateRoot" gencodec:"required"`
+	Time     *big.Int         `json:"timestamp" gencodec:"required"` // time is used to sync the validators upon a new consensus round.
+	Proposer accounts.Address `json:"proposer"  gencodec:"required"`
 
 	// block data
-	LastCommitHash        Hash  `json:"lastCommitRoot"  gencodec:"required"`
-	ProtocolViolationHash Hash  `json:"violationsHash"  gencodec:"required"`
-	TxHash                Hash  `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash           Hash  `json:"receiptHash"      gencodec:"required"`
-	Bloom                 Bloom `json:"logsBloom"        gencodec:"required"`
+	LastCommitHash        crypto.Hash  `json:"lastCommitRoot"  gencodec:"required"`
+	ProtocolViolationHash crypto.Hash  `json:"violationsHash"  gencodec:"required"`
+	TxHash                crypto.Hash  `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash           crypto.Hash  `json:"receiptHash"      gencodec:"required"`
+	Bloom                 common.Bloom `json:"logsBloom"        gencodec:"required"`
 }
 
 // headerMarshaling field type overrides for gencodec
@@ -62,18 +66,18 @@ type headerMarshaling struct {
 	Number *hexutil.Big
 	Extra  hexutil.Bytes
 	Time   *hexutil.Big
-	Hash   Hash `json:"hash"` // adds call to Hash() in MarshalJSON
+	Hash   crypto.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
-func (h *Header) Hash() Hash {
+func (h *Header) Hash() crypto.Hash {
 	return rlpHash(h)
 }
 
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
-func (h *Header) Size() StorageSize {
+func (h *Header) Size() common.StorageSize {
 	return StorageSize(unsafe.Sizeof(*h)) + StorageSize(len(h.Extra)+(h.Number.BitLen()+h.Time.BitLen())/8)
 }
 
@@ -323,7 +327,7 @@ func (bs blockSorter) Less(i, j int) bool { return bs.by(bs.blocks[i], bs.blocks
 
 // Commit contains the evidence that the block was committed by a set of validators.
 type Commit struct {
-	preCommits Votes `json:"preCommits" gencodec:"required"`
+	preCommits types.Votes `json:"preCommits" gencodec:"required"`
 }
 
 // PreCommits returns the validators' pre commits.
@@ -336,4 +340,25 @@ func CopyCommit(commit *Commit) *Commit {
 	cpy.preCommits = make(Votes, len(commit.preCommits))
 	copy(cpy.preCommits, commit.preCommits)
 	return &cpy
+}
+
+func CreateBloom(receipts transaction.Receipts) common.Bloom {
+	bin := new(big.Int)
+	for _, receipt := range receipts {
+		bin.Or(bin, LogsBloom(receipt.Logs))
+	}
+
+	return common.BytesToBloom(bin.Bytes())
+}
+
+func LogsBloom(logs []*transaction.Log) *big.Int {
+	bin := new(big.Int)
+	for _, log := range logs {
+		bin.Or(bin, common.Bloom9(log.ContractAddress.Bytes()))
+		for _, b := range log.Topics {
+			bin.Or(bin, common.Bloom9(b[:]))
+		}
+	}
+
+	return bin
 }

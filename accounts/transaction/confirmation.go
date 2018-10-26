@@ -18,16 +18,16 @@ import (
 	"context"
 	"time"
 
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/types"
 )
 
 type Backend interface {
-	TransactionReceipt(ctx context.Context, txHash types.Hash) (*types.Receipt, error)
+	TransactionReceipt(ctx context.Context, txHash crypto.Hash) (*Receipt, error)
 }
 
 // WaitMinedWithTimeout waits for tx to be mined on the blockchain within a given period of time.
-func WaitMinedWithTimeout(backend Backend, txHash types.Hash, duration time.Duration) (*types.Receipt, error) {
+func WaitMinedWithTimeout(backend Backend, txHash crypto.Hash, duration time.Duration) (*Receipt, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 	return WaitMined(ctx, backend, txHash)
@@ -35,7 +35,7 @@ func WaitMinedWithTimeout(backend Backend, txHash types.Hash, duration time.Dura
 
 // WaitMined waits for tx to be mined on the blockchain.
 // It stops waiting when the context is canceled.
-func WaitMined(ctx context.Context, backend Backend, txHash types.Hash) (*types.Receipt, error) {
+func WaitMined(ctx context.Context, backend Backend, txHash crypto.Hash) (*Receipt, error) {
 	queryTicker := time.NewTicker(time.Second)
 	defer queryTicker.Stop()
 

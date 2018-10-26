@@ -4,17 +4,18 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/event"
 	"github.com/kowala-tech/equilibrium/types"
 	"github.com/kowala-tech/kcoin/client/core"
 )
 
 // VotingTables represents the voting tables available for each election round
-type VotingTables = [2]core.VotingTable
+type VotingTables = [2]VotingTable
 
-func NewVotingTables(eventMux *event.TypeMux, voters types.Voters) (VotingTables, error) {
-	majorityFunc := func(winnerBlock types.Hash) {
-		go eventMux.Post(core.NewMajorityEvent{Winner: winnerBlock})
+func NewVotingTables(eventMux *event.TypeMux, voters Voters) (VotingTables, error) {
+	majorityFunc := func(winnerBlock crypto.Hash) {
+		go eventMux.Post(NewMajorityEvent{Winner: winnerBlock})
 	}
 
 	var err error
@@ -37,7 +38,7 @@ func NewVotingTables(eventMux *event.TypeMux, voters types.Voters) (VotingTables
 
 // VotingSystem records the election votes since round 1
 type VotingSystem struct {
-	voters         types.Voters
+	voters         Voters
 	electionNumber *big.Int // election number
 	round          uint64
 	votesPerRound  map[uint64]VotingTables
@@ -46,7 +47,7 @@ type VotingSystem struct {
 }
 
 // NewVotingSystem returns a new voting system
-func NewVotingSystem(eventMux *event.TypeMux, electionNumber *big.Int, voters types.Voters) (*VotingSystem, error) {
+func NewVotingSystem(eventMux *event.TypeMux, electionNumber *big.Int, voters Voters) (*VotingSystem, error) {
 	system := &VotingSystem{
 		voters:         voters,
 		electionNumber: electionNumber,
@@ -73,7 +74,7 @@ func (vs *VotingSystem) NewRound() error {
 }
 
 // Add registers a vote
-func (vs *VotingSystem) Add(vote types.AddressVote) error {
+func (vs *VotingSystem) Add(vote AddressVote) error {
 	votingTable, err := vs.getVoteSet(vote.Vote().Round(), vote.Vote().Type())
 	if err != nil {
 		return err
@@ -89,7 +90,7 @@ func (vs *VotingSystem) Add(vote types.AddressVote) error {
 	return nil
 }
 
-func (vs *VotingSystem) Leader(round uint64, voteType types.VoteType) (types.Hash, error) {
+func (vs *VotingSystem) Leader(round uint64, voteType VoteType) (crypto.Hash, error) {
 	votingTable, err := vs.getVoteSet(round, voteType)
 	if err != nil {
 		return types.Hash{}, err
@@ -98,7 +99,7 @@ func (vs *VotingSystem) Leader(round uint64, voteType types.VoteType) (types.Has
 	return votingTable.Leader(), nil
 }
 
-func (vs *VotingSystem) getVoteSet(round uint64, voteType types.VoteType) (core.VotingTable, error) {
+func (vs *VotingSystem) getVoteSet(round uint64, voteType VoteType) (VotingTable, error) {
 	votingTables, ok := vs.votesPerRound[round]
 	if !ok {
 		return nil, errors.New("voting table for round doesnt exists")

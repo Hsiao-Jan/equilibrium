@@ -1,7 +1,5 @@
 package types
 
-package types
-
 import (
 	"errors"
 	"io"
@@ -115,7 +113,7 @@ func (voters voters) GetRlp(i int) []byte {
 
 // Hash returns a unique Hash value for this set of Voters
 func (voters voters) Hash() common.Hash {
-	return DeriveSha(voters)
+	return common.DeriveSha(voters)
 }
 
 // Contains returns is ones Voter address is part of this set

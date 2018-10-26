@@ -4,24 +4,33 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kowala-tech/equilibrium/accounts"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/kcoin/client/common"
 )
 
+// NewMajorityEvent is posted by a voting table when there's a majority during an election.
+type NewMajorityEvent struct {
+	Winner common.Hash
+}
+
+// VotingTable represents a consensus sub-election voting table.
 type VotingTable interface {
-	Add(vote types.AddressVote) error
-	Leader() types.Hash
+	Add(vote AddressVote) error
+	Leader() crypto.Hash
 }
 
 type votingTable struct {
-	voteType types.VoteType
-	voters   types.Voters
-	votes    *types.VotesSet
+	voteType VoteType
+	voters   Voters
+	votes    *VotesSet
 	quorum   QuorumFunc
 	majority QuorumReachedFunc
 }
 
-func NewVotingTable(voteType types.VoteType, voters types.Voters, majority QuorumReachedFunc) (*votingTable, error) {
+func NewVotingTable(voteType VoteType, voters Voters, majority QuorumReachedFunc) (*votingTable, error) {
 	if voters == nil {
 		return nil, errors.New("cant create a voting table with nil voters")
 	}
@@ -35,7 +44,7 @@ func NewVotingTable(voteType types.VoteType, voters types.Voters, majority Quoru
 	}, nil
 }
 
-func (table *votingTable) Add(voteAddressed types.AddressVote) error {
+func (table *votingTable) Add(voteAddressed AddressVote) error {
 	if !table.isVoter(voteAddressed.Address()) {
 		return fmt.Errorf("voter address not found in voting table: 0x%x", voteAddressed.Address().Hash())
 	}
@@ -54,11 +63,11 @@ func (table *votingTable) Add(voteAddressed types.AddressVote) error {
 	return nil
 }
 
-func (table *votingTable) Leader() types.Hash {
+func (table *votingTable) Leader() crypto.Hash {
 	return table.votes.Leader()
 }
 
-func (table *votingTable) isDuplicate(voteAddressed types.AddressVote) error {
+func (table *votingTable) isDuplicate(voteAddressed AddressVote) error {
 	vote := voteAddressed.Vote()
 	err := table.votes.Contains(vote.Hash())
 	if err != nil {
@@ -68,7 +77,7 @@ func (table *votingTable) isDuplicate(voteAddressed types.AddressVote) error {
 	return err
 }
 
-func (table *votingTable) isVoter(address types.Address) bool {
+func (table *votingTable) isVoter(address accounts.Address) bool {
 	return table.voters.Contains(address)
 }
 
@@ -77,7 +86,7 @@ func (table *votingTable) hasQuorum() bool {
 	return table.quorum(table.votes.Len(), table.voters.Len())
 }
 
-type QuorumReachedFunc func(winner types.Hash)
+type QuorumReachedFunc func(winner crypto.Hash)
 
 type QuorumFunc func(votes, voters int) bool
 

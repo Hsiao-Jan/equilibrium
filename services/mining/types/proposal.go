@@ -20,7 +20,9 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
@@ -44,10 +46,10 @@ type proposalData struct {
 	LockedRound *uint64
 
 	// LockedBlock signals that a proposer is locked on a specific block if there's an active lock.
-	LockedBlock Hash
+	LockedBlock crypto.Hash
 
 	// Block represents the hash that uniquely identifies the proposed block.
-	Block Hash
+	Block crypto.Hash
 
 	// Signature values.
 	V *big.Int
@@ -65,12 +67,13 @@ type proposaldataMarshalling struct {
 	S           *hexutil.Big
 }
 
-func NewProposal(blockNumber *big.Int, round uint64, lockedRound *uint64, lockedBlock, block Hash) *Proposal {
+// NewProposal creates a new proposal.
+func NewProposal(blockNumber *big.Int, round uint64, lockedRound *uint64, lockedBlock, block crypto.Hash) *Proposal {
 	return newProposal(blockNumber, round, lockedRound, lockedBlock, block)
 }
 
-func newProposal(blockNumber *big.Int, round uint64, lockedRound *uint64, lockedBlock, block Hash) *Proposal {
-	data := proposaldata{
+func newProposal(blockNumber *big.Int, round uint64, lockedRound *uint64, lockedBlock, block crypto.Hash) *Proposal {
+	data := proposalData{
 		BlockNumber: new(big.Int),
 		Round:       round,
 		LockedRound: lockedRound,
@@ -93,9 +96,9 @@ func (prop *Proposal) EncodeRLP(w io.Writer) error {
 }
 
 // DecodeRLP implements rlp.Decoder.
-func (p *Proposal) DecodeRLP(s *rlp.Stream) error {
+func (prop *Proposal) DecodeRLP(s *rlp.Stream) error {
 	_, size, _ := s.Kind()
-	return s.Decode(&p.data)
+	return s.Decode(&prop.data)
 }
 
 // BlockNumber returns the block number under voting.
@@ -108,23 +111,23 @@ func (prop *Proposal) Round() uint64 { return prop.data.Round }
 func (prop *Proposal) LockedRound() *uint64 { return prop.data.LockedRound }
 
 // LockedBlock returns the unique identifier of the locked block if there's an active lock.
-func (prop *Proposal) LockedBlock() Hash { return prop.data.LockedBlock }
+func (prop *Proposal) LockedBlock() crypto.Hash { return prop.data.LockedBlock }
 
 // Block returns the hash that uniquely identifies the proposed block.
-func (prop *Proposal) Block() Hash { return prop.data.Block }
+func (prop *Proposal) Block() crypto.Hash { return prop.data.Block }
 
 // Hash hashes the RLP encoding of the proposal. It uniquely identifies the proposal.
-func (prop *Proposal) Hash() Hash {
+func (prop *Proposal) Hash() crypto.Hash {
 	if hash := prop.hash.Load(); hash != nil {
-		return hash.(Hash)
+		return hash.(crypto.Hash)
 	}
-	v := rlpHash(prop)
+	v := crypto.RLPHash(prop)
 	prop.hash.Store(v)
 	return v
 }
 
 // HashWithData returns the proposal hash to be signed by the sender.
-func (prop *Proposal) HashWithData(data ...interface{}) Hash {
+func (prop *Proposal) HashWithData(data ...interface{}) crypto.Hash {
 	propData := []interface{}{
 		prop.data.BlockNumber,
 		prop.data.Round,
@@ -132,31 +135,32 @@ func (prop *Proposal) HashWithData(data ...interface{}) Hash {
 		prop.data.LockedBlock,
 		prop.data.Block,
 	}
-	return rlpHash(append(propData, data...))
+	return crypto.RLPHash(append(propData, data...))
 }
 
 // WithSignature returns a new proposal with the given signature.
-func (proposal *Proposal) WithSignature(signer Signer, sig []byte) (*Proposal, error) {
+func (prop *Proposal) WithSignature(signer crypto.Signer, sig []byte) (*Proposal, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err
 	}
 
-	cpy := &Proposal{data: proposal.data}
+	cpy := &Proposal{data: prop.data}
 	cpy.data.R, cpy.data.S, cpy.data.V = r, s, v
 
 	return cpy, nil
 }
 
 // Protected specifies whether the proposal is protected from replay attacks or not.
-func (proposal *Proposal) Protected() bool { return true }
+func (prop *Proposal) Protected() bool { return true }
 
 // ChainID derives the proposal chain ID from the signature.
-func (proposal *Proposal) ChainID() *big.Int { return deriveChainID(proposal.data.V) }
+func (prop *Proposal) ChainID() *big.Int { return common.DeriveChainID(prop.data.V) }
 
 // SignatureValues returns the vote raw signature values
-func (proposal *Proposal) SignatureValues() (R, S, V *big.Int) {
-	R, S, V = proposal.data.R, proposal.data.S, proposal.data.V
+func (prop *Proposal) SignatureValues() (R, S, V *big.Int) {
+	R, S, V = prop.data.R, prop.data.S, prop.data.V
+	return
 }
 
 // String presents the proposal values.
