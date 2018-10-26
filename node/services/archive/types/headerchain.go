@@ -24,15 +24,15 @@ import (
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
-	config *params.ChainConfig
+	network *params.Network
 
 	chainDb       database.Database
 	genesisHeader *Header
 
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
-	currentHeaderHash Hash         // Hash of the current head of the header chain (prevent recomputing all the time)
+	currentHeaderHash crypto.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
 
-	store Store
+	store HeaderStore
 
 	procInterrupt func() bool
 
@@ -44,7 +44,7 @@ type HeaderChain struct {
 //  getValidator should return the parent's validator
 //  procInterrupt points to the parent's interrupt semaphore
 //  wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb database.Database, config *params.ChainConfig, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
+func NewHeaderChain(chainDb database.Database, network *params.Network, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -53,7 +53,7 @@ func NewHeaderChain(chainDb database.Database, config *params.ChainConfig, engin
 	}
 
 	hc := &HeaderChain{
-		config:  config,
+		network: network,
 		chainDb: chainDb,
 
 		procInterrupt: procInterrupt,
@@ -79,7 +79,7 @@ func NewHeaderChain(chainDb database.Database, config *params.ChainConfig, engin
 
 // GetBlockNumber retrieves the block number belonging to the given hash
 // from the cache or database
-func (hc *HeaderChain) GetBlockNumber(hash Hash) *uint64 {
+func (hc *HeaderChain) GetBlockNumber(hash crypto.Hash) *uint64 {
 	return hc.store.GetBlockNumber(hash)
 }
 
@@ -391,8 +391,8 @@ func (hc *HeaderChain) SetGenesis(head *Header) {
 	hc.genesisHeader = head
 }
 
-// Config retrieves the header chain's chain configuration.
-func (hc *HeaderChain) Config() *params.ChainConfig { return hc.config }
+// Network retrieves the header chain's network settings.
+func (hc *HeaderChain) Network() *params.Network { return hc.network }
 
 // Engine retrieves the header chain's consensus engine.
 func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }

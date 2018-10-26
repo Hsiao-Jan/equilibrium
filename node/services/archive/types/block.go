@@ -29,6 +29,7 @@ import (
 	miningTypes "github.com/kowala-tech/equilibrium/node/services/mining/types"
 	"github.com/kowala-tech/equilibrium/state/accounts"
 	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
+	"github.com/kowala-tech/equilibrium/state/trie"
 )
 
 //go:generate gencodec -type Header -field-override headerMarshaling -out gen_header_json.go
@@ -36,9 +37,9 @@ import (
 
 var (
 	// EmptyRootHash represents a trie hash for an empty slice of transactions.
-	EmptyRootHash = deriveSha(Transactions{})
+	EmptyRootHash = trie.DeriveSha(transaction.Transactions{})
 	// EmptyHash represents the rlp hash for nil.
-	EmptyHash = rlpHash(nil)
+	EmptyHash = crypto.RLPHash(nil)
 )
 
 // Header represents a block header.
@@ -72,13 +73,13 @@ type headerMarshaling struct {
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its
 // RLP encoding.
 func (h *Header) Hash() crypto.Hash {
-	return rlpHash(h)
+	return crypto.RLPHash(h)
 }
 
 // Size returns the approximate memory used by all internal contents. It is used
 // to approximate and limit the memory consumption of various caches.
 func (h *Header) Size() common.StorageSize {
-	return StorageSize(unsafe.Sizeof(*h)) + StorageSize(len(h.Extra)+(h.Number.BitLen()+h.Time.BitLen())/8)
+	return common.StorageSize(unsafe.Sizeof(*h)) + common.StorageSize(len(h.Extra)+(h.Number.BitLen()+h.Time.BitLen())/8)
 }
 
 // CopyHeader creates a deep copy of a block header to prevent side effects from
@@ -122,28 +123,28 @@ func NewBlock(header *Header, txs []*transaction.Transaction, receipts []*transa
 	if len(txs) == 0 {
 		block.header.TxHash = EmptyRootHash
 	} else {
-		block.header.TxHash = deriveSha(Transactions(txs))
-		block.transactions = make(Transactions, len(txs))
+		block.header.TxHash = trie.DeriveSha(transaction.Transactions(txs))
+		block.transactions = make(transaction.Transactions, len(txs))
 		copy(block.transactions, txs)
 	}
 
 	if len(receipts) == 0 {
 		block.header.ReceiptHash = EmptyRootHash
 	} else {
-		block.header.ReceiptHash = deriveSha(Receipts(receipts))
+		block.header.ReceiptHash = trie.DeriveSha(transaction.Receipts(receipts))
 		block.header.Bloom = CreateBloom(receipts)
 	}
 
 	if lastCommit != nil {
-		block.header.LastCommitHash = rlpHash(lastCommit)
+		block.header.LastCommitHash = crypto.RLPHash(lastCommit)
 		block.lastCommit = CopyCommit(lastCommit)
 	}
 
 	if len(violations) == 0 {
 		block.header.ProtocolViolationHash = EmptyHash
 	} else {
-		block.header.ProtocolViolationHash = rlpHash(violations)
-		block.protocolViolations = make([]*Conviction, len(violations))
+		block.header.ProtocolViolationHash = crypto.RLPHash(violations)
+		block.protocolViolations = make([]*miningTypes.Conviction, len(violations))
 		copy(block.protocolViolations, violations)
 	}
 
@@ -154,19 +155,19 @@ func NewBlock(header *Header, txs []*transaction.Transaction, receipts []*transa
 // and returning it, or returning a previsouly cached value.
 func (b *Block) Size() common.StorageSize {
 	if size := b.size.Load(); size != nil {
-		return size.(StorageSize)
+		return size.(common.StorageSize)
 	}
-	c := writeCounter(0)
+	c := common.WriteCounter(0)
 	rlp.Encode(&c, b)
-	b.size.Store(StorageSize(c))
-	return StorageSize(c)
+	b.size.Store(common.StorageSize(c))
+	return common.StorageSize(c)
 }
 
 // Hash returns the keccak256 hash of b's header.
 // The hash is computed on the first call and cached thereafter.
 func (b *Block) Hash() crypto.Hash {
 	if hash := b.hash.Load(); hash != nil {
-		return hash.(Hash)
+		return hash.(crypto.Hash)
 	}
 	v := b.header.Hash()
 	b.hash.Store(v)
@@ -194,8 +195,8 @@ func (b *Block) Body() *Body {
 func (b *Block) WithBody(txs []*transaction.Transaction, lastCommit *Commit, protocolViolations []*miningTypes.Conviction) *Block {
 	block := &Block{
 		header:             CopyHeader(b.header),
-		transactions:       make([]*Transaction, len(txs)),
-		protocolViolations: make([]*Conviction, len(protocolViolations)),
+		transactions:       make([]*transaction.Transaction, len(txs)),
+		protocolViolations: make([]*miningTypes.Conviction, len(protocolViolations)),
 	}
 	copy(block.transactions, txs)
 	copy(block.protocolViolations, protocolViolations)
@@ -282,7 +283,7 @@ func (b *Block) DecodeRLP(s *rlp.Stream) error {
 		return err
 	}
 	b.header, b.transactions, b.lastCommit, b.protocolViolations = eb.Header, eb.Transactions, eb.LastCommit, eb.ProtocolViolations
-	b.size.Store(StorageSize(rlp.ListSize(size)))
+	b.size.Store(common.StorageSize(rlp.ListSize(size)))
 	return nil
 }
 
@@ -337,7 +338,7 @@ func (c *Commit) PreCommits() miningTypes.Votes { return c.preCommits }
 // modifying a header variable.
 func CopyCommit(commit *Commit) *Commit {
 	cpy := *commit
-	cpy.preCommits = make(Votes, len(commit.preCommits))
+	cpy.preCommits = make(miningTypes.Votes, len(commit.preCommits))
 	copy(cpy.preCommits, commit.preCommits)
 	return &cpy
 }
