@@ -29,15 +29,15 @@ import (
 	"github.com/kowala-tech/equilibrium/common/mclock"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/database"
-	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/network/params"
 	"github.com/kowala-tech/equilibrium/node/event"
-	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/state"
 	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/equilibrium/state/trie"
-	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 	"github.com/kowala-tech/equilibrium/vm"
 	"github.com/kowala-tech/kcoin/client/consensus"
 	"go.uber.org/zap"
@@ -66,13 +66,13 @@ type RemovedLogsEvent struct{ Logs []*transaction.Log }
 
 // ChainEvent is posted when
 type ChainEvent struct {
-	Block *Block
+	Block *types.Block
 	Hash  crypto.Hash
 	Logs  []*transaction.Log
 }
 
 // ChainHeadEvent is posted when
-type ChainHeadEvent struct{ Block *Block }
+type ChainHeadEvent struct{ Block *types.Block }
 
 // CacheConfig contains the configuration values for the trie caching/pruning
 // that's resident in a blockchain.
@@ -88,11 +88,11 @@ type CacheConfig struct {
 //
 type Validator interface {
 	// ValidateBody validates the given block's content.
-	ValidateBody(block *Block) error
+	ValidateBody(block *types.Block) error
 
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
-	ValidateState(block, parent *Block, state *state.StateDB, receipts transaction.Receipts, usedGas uint64) error
+	ValidateState(block, parent *types.Block, state *state.StateDB, receipts transaction.Receipts, usedGas uint64) error
 }
 
 // Processor is an interface for processing blocks using a given initial state.
@@ -102,7 +102,7 @@ type Validator interface {
 // of gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
-	Process(block *Block, statedb *state.StateDB, cfg vm.Config) (transaction.Receipts, []*transaction.Log, uint64, error)
+	Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (transaction.Receipts, []*transaction.Log, uint64, error)
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -117,7 +117,7 @@ type BlockChain struct {
 	cacheConfig *CacheConfig    // Cache configuration for pruning.
 
 	running          int32
-	genesisBlock     *Block
+	genesisBlock     *types.Block
 	currentBlock     atomic.Value // Current head of the block chain.
 	currentFastBlock atomic.Value // Current head of the fast-sync chain (may be above the block chain!).
 	hc               *HeaderChain

@@ -16,14 +16,14 @@ package archive
 
 import (
 	"github.com/kowala-tech/equilibrium/node"
-	"github.com/kowala-tech/equilibrium/node/services/archive/types"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types/chain"
 )
 
 // Service represents the archive service.
 type Service struct {
 	cfg *Config
 
-	blockchain *types.Blockchain
+	blockchain *chain.Blockchain
 }
 
 // New retrieves a new instance of the archive service.

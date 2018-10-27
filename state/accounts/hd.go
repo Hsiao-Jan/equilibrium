@@ -23,7 +23,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/network/params"
 )
 
 // DefaultRootDerivationPath is the root path to which custom derivation endpoints

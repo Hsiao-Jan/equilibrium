@@ -15,9 +15,9 @@
 package params
 
 const (
-	// MaxTransactionsPerBlock refers to the maximum transactions supported by the
-	// consensus protocol per block.
-	MaxTransactionsPerBlock uint64 = 1000
+	// CumputeCapacity refers to the maximum computational effort supported per block by the
+	// consensus protocol.
+	CumputeCapacity uint64 = 1000
 
 	// OracleReportInterval represents the time interval (in blocks) between
 	// reports.

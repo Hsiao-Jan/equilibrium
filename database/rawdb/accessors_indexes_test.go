@@ -20,21 +20,22 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/kowala-tech/equilibrium/database"
+	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/kcoin/client/common"
 	"github.com/kowala-tech/kcoin/client/core/types"
-	"github.com/kowala-tech/kcoin/client/kcoindb"
 )
 
 // Tests that positional lookup metadata can be stored and retrieved.
 func TestLookupStorage(t *testing.T) {
-	db := kcoindb.NewMemDatabase()
+	db := database.NewMemDatabase()
 
-	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
-	tx2 := types.NewTransaction(2, common.BytesToAddress([]byte{0x22}), big.NewInt(222), 2222, big.NewInt(22222), []byte{0x22, 0x22, 0x22})
-	tx3 := types.NewTransaction(3, common.BytesToAddress([]byte{0x33}), big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
-	txs := []*types.Transaction{tx1, tx2, tx3}
+	tx1 := transaction.NewTransaction(1, common.BytesToAddress([]byte{0x11}), big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
+	tx2 := transaction.NewTransaction(2, common.BytesToAddress([]byte{0x22}), big.NewInt(222), 2222, big.NewInt(22222), []byte{0x22, 0x22, 0x22})
+	tx3 := transaction.NewTransaction(3, common.BytesToAddress([]byte{0x33}), big.NewInt(333), 3333, big.NewInt(33333), []byte{0x33, 0x33, 0x33})
+	txs := []*transaction.Transaction{tx1, tx2, tx3}
 
-	block := types.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil)
+	block := miningTypes.NewBlock(&types.Header{Number: big.NewInt(314)}, txs, nil, nil)
 
 	// Check that no transactions entries are in a pristine database
 	for i, tx := range txs {

@@ -12,4 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package params
+
+const (
+	// These are the multipliers for kcoin denominations.
+	// Example: To get the wei value of an amount in 'KCoin', use
+	//
+	//    new(big.Int).Mul(value, big.NewInt(params.KCoin))
+	//
+	Wei      = 1
+	Ada      = 1e3
+	Babbage  = 1e6
+	Shannon  = 1e9
+	Szabo    = 1e12
+	Finney   = 1e15
+	KCoin    = 1e18
+	Einstein = 1e21
+	Douglas  = 1e42
+)

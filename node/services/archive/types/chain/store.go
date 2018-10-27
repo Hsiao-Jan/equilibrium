@@ -4,6 +4,7 @@ import (
 	"crypto"
 
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 )
 
 const (
@@ -25,9 +26,9 @@ type BlockStore interface {
 
 type HeaderStore interface {
 	HasHeader(has crypto.Hash, number uint64) bool
-	GetHeader(hash crypto.Hash, number uint64) *Header
+	GetHeader(hash crypto.Hash, number uint64) *types.Header
 	GetBlockNumber(hash crypto.Hash) *uint64
 	PurgeHeaderCaches()
-	AddHeader(hash crypto.Hash, header *Header)
+	AddHeader(hash crypto.Hash, header *types.Header)
 	AddNumber(hash crypto.Hash, number uint64)
 }

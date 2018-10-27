@@ -20,8 +20,8 @@ package rawdb
 import (
 	"encoding/binary"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/metrics"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/metrics"
 )
 
 // The fields below define the low level database schema prefixing.
@@ -66,7 +66,7 @@ var (
 // TxLookupEntry is a positional metadata to help looking up the data content of
 // a transaction or receipt given only its hash.
 type TxLookupEntry struct {
-	BlockHash  common.Hash
+	BlockHash  crypto.Hash
 	BlockIndex uint64
 	Index      uint64
 }
@@ -79,12 +79,12 @@ func encodeBlockNumber(number uint64) []byte {
 }
 
 // headerKey = headerPrefix + num (uint64 big endian) + hash
-func headerKey(number uint64, hash common.Hash) []byte {
+func headerKey(number uint64, hash crypto.Hash) []byte {
 	return append(append(headerPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
 // headerTDKey = headerPrefix + num (uint64 big endian) + hash + headerTDSuffix
-func headerTDKey(number uint64, hash common.Hash) []byte {
+func headerTDKey(number uint64, hash crypto.Hash) []byte {
 	return append(headerKey(number, hash), headerTDSuffix...)
 }
 
@@ -94,27 +94,27 @@ func headerHashKey(number uint64) []byte {
 }
 
 // headerNumberKey = headerNumberPrefix + hash
-func headerNumberKey(hash common.Hash) []byte {
+func headerNumberKey(hash crypto.Hash) []byte {
 	return append(headerNumberPrefix, hash.Bytes()...)
 }
 
 // blockBodyKey = blockBodyPrefix + num (uint64 big endian) + hash
-func blockBodyKey(number uint64, hash common.Hash) []byte {
+func blockBodyKey(number uint64, hash crypto.Hash) []byte {
 	return append(append(blockBodyPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
 // blockReceiptsKey = blockReceiptsPrefix + num (uint64 big endian) + hash
-func blockReceiptsKey(number uint64, hash common.Hash) []byte {
+func blockReceiptsKey(number uint64, hash crypto.Hash) []byte {
 	return append(append(blockReceiptsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
 // txLookupKey = txLookupPrefix + hash
-func txLookupKey(hash common.Hash) []byte {
+func txLookupKey(hash crypto.Hash) []byte {
 	return append(txLookupPrefix, hash.Bytes()...)
 }
 
 // bloomBitsKey = bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash
-func bloomBitsKey(bit uint, section uint64, hash common.Hash) []byte {
+func bloomBitsKey(bit uint, section uint64, hash crypto.Hash) []byte {
 	key := append(append(bloomBitsPrefix, make([]byte, 10)...), hash.Bytes()...)
 
 	binary.BigEndian.PutUint16(key[1:], uint16(bit))
@@ -124,11 +124,11 @@ func bloomBitsKey(bit uint, section uint64, hash common.Hash) []byte {
 }
 
 // preimageKey = preimagePrefix + hash
-func preimageKey(hash common.Hash) []byte {
+func preimageKey(hash crypto.Hash) []byte {
 	return append(preimagePrefix, hash.Bytes()...)
 }
 
 // configKey = configPrefix + hash
-func configKey(hash common.Hash) []byte {
+func configKey(hash crypto.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }

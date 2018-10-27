@@ -11,11 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
+
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/params"
+	"github.com/kowala-tech/equilibrium/network/params"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
@@ -27,7 +29,7 @@ type HeaderChain struct {
 	network *params.Network
 
 	chainDb       database.Database
-	genesisHeader *Header
+	genesisHeader *types.Header
 
 	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
 	currentHeaderHash crypto.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)

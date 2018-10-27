@@ -1,4 +1,4 @@
-package effort
+package compute
 
 // Table organizes computational requirements for different kowala phases.
 type Table struct {

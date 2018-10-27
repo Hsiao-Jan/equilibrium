@@ -17,23 +17,24 @@
 package rawdb
 
 import (
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
+	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/kcoin/client/log"
 	"github.com/kowala-tech/kcoin/client/rlp"
 )
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
-func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64) {
+func ReadTxLookupEntry(db DatabaseReader, hash crypto.Hash) (crypto.Hash, uint64, uint64) {
 	data, _ := db.Get(txLookupKey(hash))
 	if len(data) == 0 {
-		return common.Hash{}, 0, 0
+		return crypto.Hash{}, 0, 0
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
 		log.Error("Invalid transaction lookup entry RLP", "hash", hash, "err", err)
-		return common.Hash{}, 0, 0
+		return crypto.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
 }
@@ -58,49 +59,49 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 }
 
 // DeleteTxLookupEntry removes all transaction data associated with a hash.
-func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
+func DeleteTxLookupEntry(db DatabaseDeleter, hash crypto.Hash) {
 	db.Delete(txLookupKey(hash))
 }
 
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
-func ReadTransaction(db DatabaseReader, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
+func ReadTransaction(db DatabaseReader, hash crypto.Hash) (*transaction.Transaction, crypto.Hash, uint64, uint64) {
 	blockHash, blockNumber, txIndex := ReadTxLookupEntry(db, hash)
-	if blockHash == (common.Hash{}) {
-		return nil, common.Hash{}, 0, 0
+	if blockHash == (crypto.Hash{}) {
+		return nil, crypto.Hash{}, 0, 0
 	}
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil || len(body.Transactions) <= int(txIndex) {
 		log.Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash, "index", txIndex)
-		return nil, common.Hash{}, 0, 0
+		return nil, crypto.Hash{}, 0, 0
 	}
 	return body.Transactions[txIndex], blockHash, blockNumber, txIndex
 }
 
 // ReadReceipt retrieves a specific transaction receipt from the database, along with
 // its added positional metadata.
-func ReadReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
+func ReadReceipt(db DatabaseReader, hash crypto.Hash) (*transaction.Receipt, crypto.Hash, uint64, uint64) {
 	blockHash, blockNumber, receiptIndex := ReadTxLookupEntry(db, hash)
-	if blockHash == (common.Hash{}) {
-		return nil, common.Hash{}, 0, 0
+	if blockHash == (crypto.Hash{}) {
+		return nil, crypto.Hash{}, 0, 0
 	}
 	receipts := ReadReceipts(db, blockHash, blockNumber)
 	if len(receipts) <= int(receiptIndex) {
 		log.Error("Receipt refereced missing", "number", blockNumber, "hash", blockHash, "index", receiptIndex)
-		return nil, common.Hash{}, 0, 0
+		return nil, crypto.Hash{}, 0, 0
 	}
 	return receipts[receiptIndex], blockHash, blockNumber, receiptIndex
 }
 
 // ReadBloomBits retrieves the compressed bloom bit vector belonging to the given
 // section and bit index from the.
-func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head common.Hash) ([]byte, error) {
+func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head crypto.Hash) ([]byte, error) {
 	return db.Get(bloomBitsKey(bit, section, head))
 }
 
 // WriteBloomBits stores the compressed bloom bits vector belonging to the given
 // section and bit index.
-func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head common.Hash, bits []byte) {
+func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head crypto.Hash, bits []byte) {
 	if err := db.Put(bloomBitsKey(bit, section, head), bits); err != nil {
 		log.Crit("Failed to store bloom bits", "err", err)
 	}

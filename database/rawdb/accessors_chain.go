@@ -21,23 +21,24 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/core/types"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
+	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/kcoin/client/log"
 	"github.com/kowala-tech/kcoin/client/rlp"
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
-func ReadCanonicalHash(db DatabaseReader, number uint64) common.Hash {
+func ReadCanonicalHash(db DatabaseReader, number uint64) crypto.Hash {
 	data, _ := db.Get(headerHashKey(number))
 	if len(data) == 0 {
-		return common.Hash{}
+		return crypto.Hash{}
 	}
-	return common.BytesToHash(data)
+	return crypto.BytesToHash(data)
 }
 
 // WriteCanonicalHash stores the hash assigned to a canonical block number.
-func WriteCanonicalHash(db DatabaseWriter, hash common.Hash, number uint64) {
+func WriteCanonicalHash(db DatabaseWriter, hash crypto.Hash, number uint64) {
 	if err := db.Put(headerHashKey(number), hash.Bytes()); err != nil {
 		log.Crit("Failed to store number to hash mapping", "err", err)
 	}
@@ -51,7 +52,7 @@ func DeleteCanonicalHash(db DatabaseDeleter, number uint64) {
 }
 
 // ReadHeaderNumber returns the header number assigned to a hash.
-func ReadHeaderNumber(db DatabaseReader, hash common.Hash) *uint64 {
+func ReadHeaderNumber(db DatabaseReader, hash crypto.Hash) *uint64 {
 	data, _ := db.Get(headerNumberKey(hash))
 	if len(data) != 8 {
 		return nil
@@ -61,48 +62,48 @@ func ReadHeaderNumber(db DatabaseReader, hash common.Hash) *uint64 {
 }
 
 // ReadHeadHeaderHash retrieves the hash of the current canonical head header.
-func ReadHeadHeaderHash(db DatabaseReader) common.Hash {
+func ReadHeadHeaderHash(db DatabaseReader) crypto.Hash {
 	data, _ := db.Get(headHeaderKey)
 	if len(data) == 0 {
-		return common.Hash{}
+		return crypto.Hash{}
 	}
-	return common.BytesToHash(data)
+	return crypto.BytesToHash(data)
 }
 
 // WriteHeadHeaderHash stores the hash of the current canonical head header.
-func WriteHeadHeaderHash(db DatabaseWriter, hash common.Hash) {
+func WriteHeadHeaderHash(db DatabaseWriter, hash crypto.Hash) {
 	if err := db.Put(headHeaderKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last header's hash", "err", err)
 	}
 }
 
 // ReadHeadBlockHash retrieves the hash of the current canonical head block.
-func ReadHeadBlockHash(db DatabaseReader) common.Hash {
+func ReadHeadBlockHash(db DatabaseReader) crypto.Hash {
 	data, _ := db.Get(headBlockKey)
 	if len(data) == 0 {
-		return common.Hash{}
+		return crypto.Hash{}
 	}
-	return common.BytesToHash(data)
+	return crypto.BytesToHash(data)
 }
 
 // WriteHeadBlockHash stores the head block's hash.
-func WriteHeadBlockHash(db DatabaseWriter, hash common.Hash) {
+func WriteHeadBlockHash(db DatabaseWriter, hash crypto.Hash) {
 	if err := db.Put(headBlockKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last block's hash", "err", err)
 	}
 }
 
 // ReadHeadFastBlockHash retrieves the hash of the current fast-sync head block.
-func ReadHeadFastBlockHash(db DatabaseReader) common.Hash {
+func ReadHeadFastBlockHash(db DatabaseReader) crypto.Hash {
 	data, _ := db.Get(headFastBlockKey)
 	if len(data) == 0 {
-		return common.Hash{}
+		return crypto.Hash{}
 	}
-	return common.BytesToHash(data)
+	return crypto.BytesToHash(data)
 }
 
 // WriteHeadFastBlockHash stores the hash of the current fast-sync head block.
-func WriteHeadFastBlockHash(db DatabaseWriter, hash common.Hash) {
+func WriteHeadFastBlockHash(db DatabaseWriter, hash crypto.Hash) {
 	if err := db.Put(headFastBlockKey, hash.Bytes()); err != nil {
 		log.Crit("Failed to store last fast block's hash", "err", err)
 	}
@@ -127,13 +128,13 @@ func WriteFastTrieProgress(db DatabaseWriter, count uint64) {
 }
 
 // ReadHeaderRLP retrieves a block header in its raw RLP database encoding.
-func ReadHeaderRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValue {
+func ReadHeaderRLP(db DatabaseReader, hash crypto.Hash, number uint64) rlp.RawValue {
 	data, _ := db.Get(headerKey(number, hash))
 	return data
 }
 
 // HasHeader verifies the existence of a block header corresponding to the hash.
-func HasHeader(db DatabaseReader, hash common.Hash, number uint64) bool {
+func HasHeader(db DatabaseReader, hash crypto.Hash, number uint64) bool {
 	if has, err := db.Has(headerKey(number, hash)); !has || err != nil {
 		return false
 	}
@@ -141,7 +142,7 @@ func HasHeader(db DatabaseReader, hash common.Hash, number uint64) bool {
 }
 
 // ReadHeader retrieves the block header corresponding to the hash.
-func ReadHeader(db DatabaseReader, hash common.Hash, number uint64) *types.Header {
+func ReadHeader(db DatabaseReader, hash crypto.Hash, number uint64) *types.Header {
 	data := ReadHeaderRLP(db, hash, number)
 	if len(data) == 0 {
 		return nil
@@ -179,7 +180,7 @@ func WriteHeader(db DatabaseWriter, header *types.Header) {
 }
 
 // DeleteHeader removes all block header data associated with a hash.
-func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
+func DeleteHeader(db DatabaseDeleter, hash crypto.Hash, number uint64) {
 	if err := db.Delete(headerKey(number, hash)); err != nil {
 		log.Crit("Failed to delete header", "err", err)
 	}
@@ -189,20 +190,20 @@ func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
 }
 
 // ReadBodyRLP retrieves the block body (transactions and commits) in RLP encoding.
-func ReadBodyRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValue {
+func ReadBodyRLP(db DatabaseReader, hash crypto.Hash, number uint64) rlp.RawValue {
 	data, _ := db.Get(blockBodyKey(number, hash))
 	return data
 }
 
 // WriteBodyRLP stores an RLP encoded block body into the database.
-func WriteBodyRLP(db DatabaseWriter, hash common.Hash, number uint64, rlp rlp.RawValue) {
+func WriteBodyRLP(db DatabaseWriter, hash crypto.Hash, number uint64, rlp rlp.RawValue) {
 	if err := db.Put(blockBodyKey(number, hash), rlp); err != nil {
 		log.Crit("Failed to store block body", "err", err)
 	}
 }
 
 // HasBody verifies the existence of a block body corresponding to the hash.
-func HasBody(db DatabaseReader, hash common.Hash, number uint64) bool {
+func HasBody(db DatabaseReader, hash crypto.Hash, number uint64) bool {
 	if has, err := db.Has(blockBodyKey(number, hash)); !has || err != nil {
 		return false
 	}
@@ -210,7 +211,7 @@ func HasBody(db DatabaseReader, hash common.Hash, number uint64) bool {
 }
 
 // ReadBody retrieves the block body corresponding to the hash.
-func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
+func ReadBody(db DatabaseReader, hash crypto.Hash, number uint64) *types.Body {
 	data := ReadBodyRLP(db, hash, number)
 	if len(data) == 0 {
 		return nil
@@ -224,7 +225,7 @@ func ReadBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 }
 
 // WriteBody storea a block body into the database.
-func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.Body) {
+func WriteBody(db DatabaseWriter, hash crypto.Hash, number uint64, body *types.Body) {
 	data, err := rlp.EncodeToBytes(body)
 	if err != nil {
 		log.Crit("Failed to RLP encode body", "err", err)
@@ -233,38 +234,38 @@ func WriteBody(db DatabaseWriter, hash common.Hash, number uint64, body *types.B
 }
 
 // DeleteBody removes all block body data associated with a hash.
-func DeleteBody(db DatabaseDeleter, hash common.Hash, number uint64) {
+func DeleteBody(db DatabaseDeleter, hash crypto.Hash, number uint64) {
 	if err := db.Delete(blockBodyKey(number, hash)); err != nil {
 		log.Crit("Failed to delete block body", "err", err)
 	}
 }
 
 // ReadReceipts retrieves all the transaction receipts belonging to a block.
-func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
+func ReadReceipts(db DatabaseReader, hash crypto.Hash, number uint64) transaction.Receipts {
 	// Retrieve the flattened receipt slice
 	data, _ := db.Get(blockReceiptsKey(number, hash))
 	if len(data) == 0 {
 		return nil
 	}
 	// Convert the revceipts from their storage form to their internal representation
-	storageReceipts := []*types.ReceiptForStorage{}
+	storageReceipts := []*transaction.ReceiptForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
 		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
 		return nil
 	}
-	receipts := make(types.Receipts, len(storageReceipts))
+	receipts := make(transaction.Receipts, len(storageReceipts))
 	for i, receipt := range storageReceipts {
-		receipts[i] = (*types.Receipt)(receipt)
+		receipts[i] = (*transaction.Receipt)(receipt)
 	}
 	return receipts
 }
 
 // WriteReceipts stores all the transaction receipts belonging to a block.
-func WriteReceipts(db DatabaseWriter, hash common.Hash, number uint64, receipts types.Receipts) {
+func WriteReceipts(db DatabaseWriter, hash crypto.Hash, number uint64, receipts transaction.Receipts) {
 	// Convert the receipts into their storage form and serialize them
-	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
+	storageReceipts := make([]*transaction.ReceiptForStorage, len(receipts))
 	for i, receipt := range receipts {
-		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
+		storageReceipts[i] = (*transaction.ReceiptForStorage)(receipt)
 	}
 	bytes, err := rlp.EncodeToBytes(storageReceipts)
 	if err != nil {
@@ -277,7 +278,7 @@ func WriteReceipts(db DatabaseWriter, hash common.Hash, number uint64, receipts 
 }
 
 // DeleteReceipts removes all receipt data associated with a block hash.
-func DeleteReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
+func DeleteReceipts(db DatabaseDeleter, hash crypto.Hash, number uint64) {
 	if err := db.Delete(blockReceiptsKey(number, hash)); err != nil {
 		log.Crit("Failed to delete block receipts", "err", err)
 	}
@@ -289,7 +290,7 @@ func DeleteReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
 //
 // Note, due to concurrent download of header and block body the header and thus
 // canonical hash can be stored in the database but the body data not (yet).
-func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block {
+func ReadBlock(db DatabaseReader, hash crypto.Hash, number uint64) *types.Block {
 	header := ReadHeader(db, hash, number)
 	if header == nil {
 		return nil
@@ -298,7 +299,7 @@ func ReadBlock(db DatabaseReader, hash common.Hash, number uint64) *types.Block 
 	if body == nil {
 		return nil
 	}
-	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.LastCommit)
+	return types.NewBlockWithHeader(header).WithBody(body.Transactions, body.LastCommit, body.ProtocolViolations)
 }
 
 // WriteBlock serializes a block into the database, header and body separately.
@@ -308,7 +309,7 @@ func WriteBlock(db DatabaseWriter, block *types.Block) {
 }
 
 // DeleteBlock removes all block data associated with a hash.
-func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
+func DeleteBlock(db DatabaseDeleter, hash crypto.Hash, number uint64) {
 	DeleteReceipts(db, hash, number)
 	DeleteHeader(db, hash, number)
 	DeleteBody(db, hash, number)
@@ -317,23 +318,23 @@ func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
 // FindCommonAncestor returns the last common ancestor of two block headers
 func FindCommonAncestor(db DatabaseReader, a, b *types.Header) *types.Header {
 	for bn := b.Number.Uint64(); a.Number.Uint64() > bn; {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+		a = ReadHeader(db, a.PreviousBlockHash, a.Number.Uint64()-1)
 		if a == nil {
 			return nil
 		}
 	}
 	for an := a.Number.Uint64(); an < b.Number.Uint64(); {
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+		b = ReadHeader(db, b.PreviousBlockHash, b.Number.Uint64()-1)
 		if b == nil {
 			return nil
 		}
 	}
 	for a.Hash() != b.Hash() {
-		a = ReadHeader(db, a.ParentHash, a.Number.Uint64()-1)
+		a = ReadHeader(db, a.PreviousBlockHash, a.Number.Uint64()-1)
 		if a == nil {
 			return nil
 		}
-		b = ReadHeader(db, b.ParentHash, b.Number.Uint64()-1)
+		b = ReadHeader(db, b.PreviousBlockHash, b.Number.Uint64()-1)
 		if b == nil {
 			return nil
 		}

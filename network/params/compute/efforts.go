@@ -1,4 +1,4 @@
-package effort
+package compute
 
 // computational effort for different operations
 const (

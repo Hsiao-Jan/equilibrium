@@ -23,10 +23,10 @@ import (
 	"syscall"
 
 	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/network/params"
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/node/p2p"
 	"github.com/kowala-tech/equilibrium/node/services/archive"
-	"github.com/kowala-tech/equilibrium/params"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	homedir "github.com/mitchellh/go-homedir"
@@ -60,7 +60,10 @@ var (
 	// listenIP represents the ip used for incoming connections.
 	listenIP string
 
-	isDevNetwork, isTestNetwork bool
+	// mode specifies if the system should be used in production, development or test mode.
+	mode string 
+
+	currency 
 )
 
 const rootCmdLongDesc = `A longer description that spans multiple lines and likely contains
@@ -98,8 +101,7 @@ func init() {
 	rootCmd.Flags().StringVar(&nodeKey, "identity", "", "path of the p2p host key file")
 	rootCmd.Flags().IntVarP(&listenPort, "port", "p", 32000, "port for incoming connections")
 	rootCmd.Flags().StringVar(&listenIP, "ip", "", "ip used for incoming connections")
-	rootCmd.Flags().BoolVar(&isDevNetwork, "dev", false, "pre-configured settings for the dev network")
-	rootCmd.Flags().BoolVar(&isDevNetwork, "test", false, "pre-configured settings for the test network")
+	rootCmd.Flags().StringVar(&listenIP, "mode", network.Production.String(), "network mode")
 
 }
 

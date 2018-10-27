@@ -1,15 +1,6 @@
 package types
 
-import (
-	"fmt"
-
-	"github.com/kowala-tech/equilibrium/params"
-	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
-	"github.com/kowala-tech/equilibrium/types"
-	"github.com/kowala-tech/kcoin/client/consensus"
-	"github.com/kowala-tech/kcoin/client/core/state"
-)
-
+/*
 // BlockValidator is responsible for validating block headers and
 // processed state. BlockValidator implements Validator.
 type BlockValidator struct {
@@ -80,3 +71,5 @@ func (v *BlockValidator) ValidateState(block *Block, statedb *state.StateDB, rec
 	}
 	return nil
 }
+
+*/

@@ -17,12 +17,11 @@
 package rawdb
 
 import (
-	"encoding/json"
+	"go.uber.org/zap"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/log"
-	"github.com/kowala-tech/kcoin/client/params"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/log"
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.
@@ -39,12 +38,14 @@ func ReadDatabaseVersion(db DatabaseReader) int {
 func WriteDatabaseVersion(db DatabaseWriter, version int) {
 	enc, _ := rlp.EncodeToBytes(version)
 	if err := db.Put(databaseVerisionKey, enc); err != nil {
-		log.Crit("Failed to store the database version", "err", err)
+		log.Fatal("Failed to store the database version", zap.Error(err))
 	}
 }
 
+// @TODO (rgeraldes)
+/*
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
+func ReadChainConfig(db DatabaseReader, hash crypto.Hash) *params.ChainConfig {
 	data, _ := db.Get(configKey(hash))
 	if len(data) == 0 {
 		return nil
@@ -58,7 +59,7 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConfig) {
+func WriteChainConfig(db DatabaseWriter, hash crypto.Hash, cfg *params.ChainConfig) {
 	if cfg == nil {
 		return
 	}
@@ -70,19 +71,20 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConf
 		log.Crit("Failed to store chain config", "err", err)
 	}
 }
+*/
 
 // ReadPreimage retrieves a single preimage of the provided hash.
-func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
+func ReadPreimage(db DatabaseReader, hash crypto.Hash) []byte {
 	data, _ := db.Get(preimageKey(hash))
 	return data
 }
 
 // WritePreimages writes the provided set of preimages to the database. `number` is the
 // current block number, and is used for debug messages only.
-func WritePreimages(db DatabaseWriter, number uint64, preimages map[common.Hash][]byte) {
+func WritePreimages(db DatabaseWriter, number uint64, preimages map[crypto.Hash][]byte) {
 	for hash, preimage := range preimages {
 		if err := db.Put(preimageKey(hash), preimage); err != nil {
-			log.Crit("Failed to store trie preimage", "err", err)
+			log.Fatal("Failed to store trie preimage", zap.Error(err))
 		}
 	}
 	preimageCounter.Inc(int64(len(preimages)))

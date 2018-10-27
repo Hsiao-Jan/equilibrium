@@ -23,7 +23,6 @@ import (
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
-	"github.com/kowala-tech/equilibrium/params"
 	"github.com/kowala-tech/equilibrium/state/accounts"
 )
 
@@ -155,21 +154,6 @@ func (tx *Transaction) Size() common.StorageSize {
 	rlp.Encode(&c, &tx.data)
 	tx.size.Store(common.StorageSize(c))
 	return common.StorageSize(c)
-}
-
-// StabilityFee returns the stability fee of a transaction for a specific stabilization level.
-func (tx *Transaction) StabilityFee(stabilizationLevel uint64) *big.Int {
-	return Fee(tx.ComputeFee(), stabilizationLevel, tx.Amount())
-}
-
-// ComputeFee returns the transaction's compute fee (max compute fee for contract calls).
-func (tx *Transaction) ComputeFee() *big.Int {
-	return new(big.Int).Mul(params.ComputeUnitPrice, new(big.Int).SetUint64(tx.data.ComputeLimit))
-}
-
-// Cost returns the transaction cost for a specific stabilization level.
-func (tx *Transaction) Cost(stabilizationLevel uint64) *big.Int {
-	return new(big.Int).Add(new(big.Int).Add(tx.ComputeFee(), tx.StabilityFee(stabilizationLevel)), tx.Amount())
 }
 
 // Protected specifies whether the transaction is protected from replay attacks or not.
