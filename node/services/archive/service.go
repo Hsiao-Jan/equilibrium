@@ -15,18 +15,33 @@
 package archive
 
 import (
+	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types/chain"
 )
 
+const (
+	chainDataDirName = "chaindata"
+)
+
 // Service represents the archive service.
 type Service struct {
-	cfg *Config
-
-	blockchain *chain.Blockchain
+	network *network.Settings
 }
 
 // New retrieves a new instance of the archive service.
 func New(cfg *Config, ctx *node.ServiceContext) (*Service, error) {
-	return &Service{}, nil
+	chainDB, err := createDB(ctx, config, chainDataDirName)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := genesis.Setup(chainDb, config.Genesis)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &Service{
+		network: settings,
+	}, nil
 }

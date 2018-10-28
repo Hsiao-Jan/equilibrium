@@ -17,11 +17,13 @@
 package rawdb
 
 import (
-	"go.uber.org/zap"
+	"encoding/json"
 
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/network"
+	"go.uber.org/zap"
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.
@@ -42,36 +44,33 @@ func WriteDatabaseVersion(db DatabaseWriter, version int) {
 	}
 }
 
-// @TODO (rgeraldes)
-/*
-// ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-func ReadChainConfig(db DatabaseReader, hash crypto.Hash) *params.ChainConfig {
+// ReadNetworkSettings retrieves the network settings based on the given genesis hash.
+func ReadNetworkSettings(db DatabaseReader, hash crypto.Hash) *network.Settings {
 	data, _ := db.Get(configKey(hash))
 	if len(data) == 0 {
 		return nil
 	}
-	var config params.ChainConfig
+	var config network.Settings
 	if err := json.Unmarshal(data, &config); err != nil {
-		log.Error("Invalid chain config JSON", "hash", hash, "err", err)
+		log.Error("Invalid chain config JSON", zap.String("hash", hash.String()), zap.Error(err))
 		return nil
 	}
 	return &config
 }
 
-// WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db DatabaseWriter, hash crypto.Hash, cfg *params.ChainConfig) {
+// WriteNetworkSettings writes the network settings to the database.
+func WriteNetworkSettings(db DatabaseWriter, hash crypto.Hash, cfg *network.Settings) {
 	if cfg == nil {
 		return
 	}
 	data, err := json.Marshal(cfg)
 	if err != nil {
-		log.Crit("Failed to JSON encode chain config", "err", err)
+		log.Fatal("Failed to JSON encode chain config", zap.Error(err))
 	}
 	if err := db.Put(configKey(hash), data); err != nil {
-		log.Crit("Failed to store chain config", "err", err)
+		log.Fatal("Failed to store chain config", zap.Error(err))
 	}
 }
-*/
 
 // ReadPreimage retrieves a single preimage of the provided hash.
 func ReadPreimage(db DatabaseReader, hash crypto.Hash) []byte {

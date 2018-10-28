@@ -11,13 +11,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kowala-tech/equilibrium/network/params"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network/params"
+	"github.com/kowala-tech/equilibrium/network"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
@@ -26,7 +27,7 @@ import (
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
-	network *params.Network
+	network *network.Settings
 
 	chainDb       database.Database
 	genesisHeader *types.Header

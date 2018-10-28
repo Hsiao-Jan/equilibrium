@@ -31,7 +31,7 @@ import (
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network/params"
+	"github.com/kowala-tech/equilibrium/network"
 	"github.com/kowala-tech/equilibrium/node/event"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/state"
@@ -113,7 +113,7 @@ type BlockChain struct {
 	chainmu sync.RWMutex // blockchain insertion lock.
 	procmu  sync.RWMutex // block processor lock.
 
-	network     *params.Network // network configuration.
+	network     *network.Settings // network configuration.
 	cacheConfig *CacheConfig    // Cache configuration for pruning.
 
 	running          int32
@@ -154,7 +154,7 @@ type BlockChain struct {
 
 // New returns a fully initialised block chain using information
 // available in the database.
-func New(db database.Database, cacheConfig *CacheConfig, network *params.Network, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func New(db database.Database, cacheConfig *CacheConfig, network *network.Settings, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,

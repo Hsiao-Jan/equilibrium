@@ -15,9 +15,9 @@
 package params
 
 const (
-	// CumputeCapacity refers to the maximum computational effort supported per block by the
+	// GenesisComputeCapacity refers to the maximum computational effort supported per block by the
 	// consensus protocol.
-	CumputeCapacity uint64 = 1000
+	GenesisComputeCapacity uint64 = 1000
 
 	// OracleReportInterval represents the time interval (in blocks) between
 	// reports.
