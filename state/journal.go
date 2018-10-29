@@ -19,7 +19,8 @@ package state
 import (
 	"math/big"
 
-	"github.com/kowala-tech/kcoin/client/common"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/state/accounts"
 )
 
 // journalEntry is a modification entry in the state change journal that can be
@@ -29,21 +30,21 @@ type journalEntry interface {
 	revert(*StateDB)
 
 	// dirtied returns the Ethereum address modified by this journal entry.
-	dirtied() *common.Address
+	dirtied() *accounts.Address
 }
 
 // journal contains the list of state modifications applied since the last state
 // commit. These are tracked to be able to be reverted in case of an execution
 // exception or revertal request.
 type journal struct {
-	entries []journalEntry         // Current changes tracked by the journal
-	dirties map[common.Address]int // Dirty accounts and the number of changes
+	entries []journalEntry           // Current changes tracked by the journal
+	dirties map[accounts.Address]int // Dirty accounts and the number of changes
 }
 
 // newJournal create a new initialized journal.
 func newJournal() *journal {
 	return &journal{
-		dirties: make(map[common.Address]int),
+		dirties: make(map[accounts.Address]int),
 	}
 }
 
@@ -75,7 +76,7 @@ func (j *journal) revert(statedb *StateDB, snapshot int) {
 // dirty explicitly sets an address to dirty, even if the change entries would
 // otherwise suggest it as clean. This method is an ugly hack to handle the RIPEMD
 // precompile consensus exception.
-func (j *journal) dirty(addr common.Address) {
+func (j *journal) dirty(addr accounts.Address) {
 	j.dirties[addr]++
 }
 
@@ -87,32 +88,32 @@ func (j *journal) length() int {
 type (
 	// Changes to the account trie.
 	createObjectChange struct {
-		account *common.Address
+		account *accounts.Address
 	}
 	resetObjectChange struct {
 		prev *stateObject
 	}
 	suicideChange struct {
-		account     *common.Address
+		account     *accounts.Address
 		prev        bool // whether account had already suicided
 		prevbalance *big.Int
 	}
 
 	// Changes to individual accounts.
 	balanceChange struct {
-		account *common.Address
+		account *accounts.Address
 		prev    *big.Int
 	}
 	nonceChange struct {
-		account *common.Address
+		account *accounts.Address
 		prev    uint64
 	}
 	storageChange struct {
-		account       *common.Address
-		key, prevalue common.Hash
+		account       *accounts.Address
+		key, prevalue crypto.Hash
 	}
 	codeChange struct {
-		account            *common.Address
+		account            *accounts.Address
 		prevcode, prevhash []byte
 	}
 
@@ -121,13 +122,13 @@ type (
 		prev uint64
 	}
 	addLogChange struct {
-		txhash common.Hash
+		txhash crypto.Hash
 	}
 	addPreimageChange struct {
-		hash common.Hash
+		hash crypto.Hash
 	}
 	touchChange struct {
-		account   *common.Address
+		account   *accounts.Address
 		prev      bool
 		prevDirty bool
 	}
@@ -138,7 +139,7 @@ func (ch createObjectChange) revert(s *StateDB) {
 	delete(s.stateObjectsDirty, *ch.account)
 }
 
-func (ch createObjectChange) dirtied() *common.Address {
+func (ch createObjectChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
@@ -146,7 +147,7 @@ func (ch resetObjectChange) revert(s *StateDB) {
 	s.setStateObject(ch.prev)
 }
 
-func (ch resetObjectChange) dirtied() *common.Address {
+func (ch resetObjectChange) dirtied() *accounts.Address {
 	return nil
 }
 
@@ -158,16 +159,16 @@ func (ch suicideChange) revert(s *StateDB) {
 	}
 }
 
-func (ch suicideChange) dirtied() *common.Address {
+func (ch suicideChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
-var ripemd = common.HexToAddress("0000000000000000000000000000000000000003")
+var ripemd = accounts.HexToAddress("0000000000000000000000000000000000000003")
 
 func (ch touchChange) revert(s *StateDB) {
 }
 
-func (ch touchChange) dirtied() *common.Address {
+func (ch touchChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
@@ -175,7 +176,7 @@ func (ch balanceChange) revert(s *StateDB) {
 	s.getStateObject(*ch.account).setBalance(ch.prev)
 }
 
-func (ch balanceChange) dirtied() *common.Address {
+func (ch balanceChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
@@ -183,15 +184,15 @@ func (ch nonceChange) revert(s *StateDB) {
 	s.getStateObject(*ch.account).setNonce(ch.prev)
 }
 
-func (ch nonceChange) dirtied() *common.Address {
+func (ch nonceChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
 func (ch codeChange) revert(s *StateDB) {
-	s.getStateObject(*ch.account).setCode(common.BytesToHash(ch.prevhash), ch.prevcode)
+	s.getStateObject(*ch.account).setCode(crypto.BytesToHash(ch.prevhash), ch.prevcode)
 }
 
-func (ch codeChange) dirtied() *common.Address {
+func (ch codeChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
@@ -199,7 +200,7 @@ func (ch storageChange) revert(s *StateDB) {
 	s.getStateObject(*ch.account).setState(ch.key, ch.prevalue)
 }
 
-func (ch storageChange) dirtied() *common.Address {
+func (ch storageChange) dirtied() *accounts.Address {
 	return ch.account
 }
 
@@ -207,7 +208,7 @@ func (ch refundChange) revert(s *StateDB) {
 	s.refund = ch.prev
 }
 
-func (ch refundChange) dirtied() *common.Address {
+func (ch refundChange) dirtied() *accounts.Address {
 	return nil
 }
 
@@ -221,7 +222,7 @@ func (ch addLogChange) revert(s *StateDB) {
 	s.logSize--
 }
 
-func (ch addLogChange) dirtied() *common.Address {
+func (ch addLogChange) dirtied() *accounts.Address {
 	return nil
 }
 
@@ -229,6 +230,6 @@ func (ch addPreimageChange) revert(s *StateDB) {
 	delete(s.preimages, ch.hash)
 }
 
-func (ch addPreimageChange) dirtied() *common.Address {
+func (ch addPreimageChange) dirtied() *accounts.Address {
 	return nil
 }

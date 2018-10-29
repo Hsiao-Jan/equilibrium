@@ -30,7 +30,7 @@ var (
 // the protocol stack, that is passed to all constructors to be optionally used;
 // as well as utility methods to operate on the service environment.
 type Context struct {
-	//cfg      *Config
+	cfg      *Config
 	Services map[reflect.Type]Service // Index of the already constructed services
 	EventMux *event.TypeMux           // Event multiplexer used for decoupled notifications
 	//AccountManager  *accounts.Manager        // Account manager created by the node.
@@ -47,6 +47,11 @@ func (ctx *Context) Service(service interface{}) error {
 		return nil
 	}
 	return errServiceUnknown
+}
+
+// DataDir retrieves the current data directory.
+func (ctx *Context) DataDir() string {
+	return ctx.cfg.DataDir
 }
 
 // Constructor is the function signature of the constructors needed to be

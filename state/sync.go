@@ -19,21 +19,21 @@ package state
 import (
 	"bytes"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/rlp"
-	"github.com/kowala-tech/kcoin/client/trie"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/state/trie"
 )
 
 // NewStateSync create a new state trie download scheduler.
-func NewStateSync(root common.Hash, database trie.DatabaseReader) *trie.Sync {
+func NewStateSync(root crypto.Hash, database trie.DatabaseReader) *trie.Sync {
 	var syncer *trie.Sync
-	callback := func(leaf []byte, parent common.Hash) error {
+	callback := func(leaf []byte, parent crypto.Hash) error {
 		var obj Account
 		if err := rlp.Decode(bytes.NewReader(leaf), &obj); err != nil {
 			return err
 		}
 		syncer.AddSubTrie(obj.Root, 64, parent, nil)
-		syncer.AddRawEntry(common.BytesToHash(obj.CodeHash), 64, parent)
+		syncer.AddRawEntry(crypto.BytesToHash(obj.CodeHash), 64, parent)
 		return nil
 	}
 	syncer = trie.NewSync(root, database, callback)

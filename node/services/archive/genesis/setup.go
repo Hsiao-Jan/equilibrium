@@ -30,7 +30,7 @@ func (gen *Genesis) ToBlock(db database.Database) *types.Block{
 	}
 
 	statedb, _ := state.New(crypto.Hash{}, state.NewDatabase(db))
-	for addr, account := range g.Alloc {
+	for addr, account := range g.Accounts {
 		statedb.AddBalance(addr, account.Balance)
 		statedb.SetCode(addr, account.Code)
 		statedb.SetNonce(addr, account.Nonce)
@@ -42,7 +42,7 @@ func (gen *Genesis) ToBlock(db database.Database) *types.Block{
 	head := &types.Header{
 		Number:     new(big.Int).SetUint64(g.Number),
 		Time:       new(big.Int).SetUint64(g.Timestamp),
-		ParentHash: g.ParentHash,
+		PreviousBlockHash: g.ParentHash,
 		Extra:      g.ExtraData,
 		GasLimit:   g.GasLimit,
 		GasUsed:    g.GasUsed,

@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/rlp"
-	"github.com/kowala-tech/kcoin/client/trie"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/state/trie"
 )
 
 // NodeIterator is an iterator to traverse the entire state trie post-order,
@@ -33,12 +33,12 @@ type NodeIterator struct {
 	stateIt trie.NodeIterator // Primary iterator for the global state trie
 	dataIt  trie.NodeIterator // Secondary iterator for the data trie of a contract
 
-	accountHash common.Hash // Hash of the node containing the account
-	codeHash    common.Hash // Hash of the contract source code
+	accountHash crypto.Hash // Hash of the node containing the account
+	codeHash    crypto.Hash // Hash of the contract source code
 	code        []byte      // Source code associated with a contract
 
-	Hash   common.Hash // Hash of the current entry being iterated (nil if not standalone)
-	Parent common.Hash // Hash of the first full ancestor node (nil if current is the root)
+	Hash   crypto.Hash // Hash of the current entry being iterated (nil if not standalone)
+	Parent crypto.Hash // Hash of the first full ancestor node (nil if current is the root)
 
 	Error error // Failure set in case of an internal error in the iterator
 }
@@ -108,7 +108,7 @@ func (it *NodeIterator) step() error {
 	if err := rlp.Decode(bytes.NewReader(it.stateIt.LeafBlob()), &account); err != nil {
 		return err
 	}
-	dataTrie, err := it.state.db.OpenStorageTrie(common.BytesToHash(it.stateIt.LeafKey()), account.Root)
+	dataTrie, err := it.state.db.OpenStorageTrie(crypto.BytesToHash(it.stateIt.LeafKey()), account.Root)
 	if err != nil {
 		return err
 	}
@@ -117,9 +117,9 @@ func (it *NodeIterator) step() error {
 		it.dataIt = nil
 	}
 	if !bytes.Equal(account.CodeHash, emptyCodeHash) {
-		it.codeHash = common.BytesToHash(account.CodeHash)
-		addrHash := common.BytesToHash(it.stateIt.LeafKey())
-		it.code, err = it.state.db.ContractCode(addrHash, common.BytesToHash(account.CodeHash))
+		it.codeHash = crypto.BytesToHash(account.CodeHash)
+		addrHash := crypto.BytesToHash(it.stateIt.LeafKey())
+		it.code, err = it.state.db.ContractCode(addrHash, crypto.BytesToHash(account.CodeHash))
 		if err != nil {
 			return fmt.Errorf("code %x: %v", account.CodeHash, err)
 		}
@@ -132,7 +132,7 @@ func (it *NodeIterator) step() error {
 // The method returns whether there are any more data left for inspection.
 func (it *NodeIterator) retrieve() bool {
 	// Clear out any previously set values
-	it.Hash = common.Hash{}
+	it.Hash = crypto.Hash{}
 
 	// If the iteration's done, return no available data
 	if it.state == nil {
@@ -142,7 +142,7 @@ func (it *NodeIterator) retrieve() bool {
 	switch {
 	case it.dataIt != nil:
 		it.Hash, it.Parent = it.dataIt.Hash(), it.dataIt.Parent()
-		if it.Parent == (common.Hash{}) {
+		if it.Parent == (crypto.Hash{}) {
 			it.Parent = it.accountHash
 		}
 	case it.code != nil:

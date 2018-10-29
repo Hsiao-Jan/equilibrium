@@ -18,10 +18,11 @@ package rawdb
 
 import (
 	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
-	"github.com/kowala-tech/kcoin/client/log"
 	"github.com/kowala-tech/kcoin/client/rlp"
+	"go.uber.org/zap"
 )
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
@@ -33,7 +34,7 @@ func ReadTxLookupEntry(db DatabaseReader, hash crypto.Hash) (crypto.Hash, uint64
 	}
 	var entry TxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
-		log.Error("Invalid transaction lookup entry RLP", "hash", hash, "err", err)
+		log.Error("Invalid transaction lookup entry RLP", zap.String("hash", hash.String()), zap.Error(err))
 		return crypto.Hash{}, 0, 0
 	}
 	return entry.BlockHash, entry.BlockIndex, entry.Index
@@ -50,10 +51,10 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		}
 		data, err := rlp.EncodeToBytes(entry)
 		if err != nil {
-			log.Crit("Failed to encode transaction lookup entry", "err", err)
+			log.Fatal("Failed to encode transaction lookup entry", zap.Error(err))
 		}
 		if err := db.Put(txLookupKey(tx.Hash()), data); err != nil {
-			log.Crit("Failed to store transaction lookup entry", "err", err)
+			log.Fatal("Failed to store transaction lookup entry", zap.Error(err))
 		}
 	}
 }
@@ -72,7 +73,7 @@ func ReadTransaction(db DatabaseReader, hash crypto.Hash) (*transaction.Transact
 	}
 	body := ReadBody(db, blockHash, blockNumber)
 	if body == nil || len(body.Transactions) <= int(txIndex) {
-		log.Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash, "index", txIndex)
+		log.Error("Transaction referenced missing", zap.Uint64("number", blockNumber), zap.String("hash", blockHash.String()), zap.Uint64("index", txIndex))
 		return nil, crypto.Hash{}, 0, 0
 	}
 	return body.Transactions[txIndex], blockHash, blockNumber, txIndex
@@ -87,7 +88,7 @@ func ReadReceipt(db DatabaseReader, hash crypto.Hash) (*transaction.Receipt, cry
 	}
 	receipts := ReadReceipts(db, blockHash, blockNumber)
 	if len(receipts) <= int(receiptIndex) {
-		log.Error("Receipt refereced missing", "number", blockNumber, "hash", blockHash, "index", receiptIndex)
+		log.Error("Receipt refereced missing", zap.Uint64("number", blockNumber), zap.String("hash", blockHash.String()), zap.Uint64("index", receiptIndex))
 		return nil, crypto.Hash{}, 0, 0
 	}
 	return receipts[receiptIndex], blockHash, blockNumber, receiptIndex
@@ -103,6 +104,6 @@ func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head crypto.Hash
 // section and bit index.
 func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head crypto.Hash, bits []byte) {
 	if err := db.Put(bloomBitsKey(bit, section, head), bits); err != nil {
-		log.Crit("Failed to store bloom bits", "err", err)
+		log.Fatal("Failed to store bloom bits", zap.Error(err))
 	}
 }

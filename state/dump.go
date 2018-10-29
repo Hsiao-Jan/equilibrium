@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/rlp"
-	"github.com/kowala-tech/kcoin/client/trie"
+	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/state/accounts"
+	"github.com/kowala-tech/equilibrium/state/trie"
 )
 
 type DumpAccount struct {
@@ -53,7 +54,7 @@ func (self *StateDB) RawDump() Dump {
 			panic(err)
 		}
 
-		obj := newObject(nil, common.BytesToAddress(addr), data)
+		obj := newObject(nil, accounts.BytesToAddress(addr), data)
 		account := DumpAccount{
 			Balance:  data.Balance.String(),
 			Nonce:    data.Nonce,

@@ -28,7 +28,6 @@ import (
 	"github.com/kowala-tech/equilibrium/log"
 	"github.com/kowala-tech/equilibrium/node/event"
 	"github.com/kowala-tech/equilibrium/node/p2p"
-	srvc "github.com/kowala-tech/equilibrium/node/services"
 	"github.com/prometheus/prometheus/util/flock"
 	"go.uber.org/zap"
 )
@@ -79,8 +78,8 @@ type Node struct {
 	eventMux *event.TypeMux
 	//accountMgr *accounts.Manager
 
-	serviceFuncs []srvc.Constructor            // Service constructors (in dependency order)
-	services     map[reflect.Type]srvc.Service // Currently running services
+	serviceFuncs []Constructor            // Service constructors (in dependency order)
+	services     map[reflect.Type]Service // Currently running services
 
 	dirLock flock.Releaser // prevents concurrent use of instance directory
 
@@ -121,7 +120,7 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 
 	return &Node{
 		cfg:          cfg,
-		serviceFuncs: []srvc.Constructor{},
+		serviceFuncs: []Constructor{},
 		//engine:       konsensus.New(),
 		eventMux: new(event.TypeMux),
 		//accountMgr: accountMgr,
@@ -130,7 +129,7 @@ func New(ctx context.Context, cfg *Config) (*Node, error) {
 
 // Register injects a new service into the node's stack. The service created by
 // the passed constructor must be unique in its type with regard to sibling ones.
-func (n *Node) Register(constructor srvc.Constructor) error {
+func (n *Node) Register(constructor Constructor) error {
 	n.nodeMu.Lock()
 	defer n.nodeMu.Unlock()
 
@@ -162,12 +161,12 @@ func (n *Node) Start() error {
 	//log.Info("Starting p2p node", zap.String("instance", n.hostCfg.Name))
 
 	// Otherwise copy and specialize the P2P configuration
-	services := make(map[reflect.Type]srvc.Service)
+	services := make(map[reflect.Type]Service)
 	for _, constructor := range n.serviceFuncs {
 		// Create a new context for the particular service
-		ctx := &srvc.Context{
+		ctx := &Context{
 			//cfg:      n.cfg,
-			Services: make(map[reflect.Type]srvc.Service),
+			Services: make(map[reflect.Type]Service),
 			//AccountManager: n.accountMgr,
 			EventMux: n.eventMux,
 		}

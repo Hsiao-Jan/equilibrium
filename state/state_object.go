@@ -22,9 +22,9 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/kowala-tech/kcoin/client/common"
-	"github.com/kowala-tech/kcoin/client/crypto"
-	"github.com/kowala-tech/kcoin/client/rlp"
+	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/encoding/rlp"
+	"github.com/kowala-tech/equilibrium/state/accounts"
 )
 
 var emptyCodeHash = crypto.Keccak256(nil)
@@ -35,7 +35,7 @@ func (self Code) String() string {
 	return string(self) //strings.Join(Disassemble(self), " ")
 }
 
-type Storage map[common.Hash]common.Hash
+type Storage map[crypto.Hash]crypto.Hash
 
 func (self Storage) String() (str string) {
 	for key, value := range self {
@@ -61,8 +61,8 @@ func (self Storage) Copy() Storage {
 // Account values can be accessed and modified through the object.
 // Finally, call CommitTrie to write the modified storage trie into a database.
 type stateObject struct {
-	address  common.Address
-	addrHash common.Hash // hash of ethereum address of the account
+	address  accounts.Address
+	addrHash crypto.Hash // hash of ethereum address of the account
 	data     Account
 	db       *StateDB
 
@@ -98,12 +98,12 @@ func (s *stateObject) empty() bool {
 type Account struct {
 	Nonce    uint64
 	Balance  *big.Int
-	Root     common.Hash // merkle root of the storage trie
+	Root     crypto.Hash // merkle root of the storage trie
 	CodeHash []byte
 }
 
 // newObject creates a state object.
-func newObject(db *StateDB, address common.Address, data Account) *stateObject {
+func newObject(db *StateDB, address accounts.Address, data Account) *stateObject {
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
@@ -152,7 +152,7 @@ func (c *stateObject) getTrie(db Database) Trie {
 		var err error
 		c.trie, err = db.OpenStorageTrie(c.addrHash, c.data.Root)
 		if err != nil {
-			c.trie, _ = db.OpenStorageTrie(c.addrHash, common.Hash{})
+			c.trie, _ = db.OpenStorageTrie(c.addrHash, crypto.Hash{})
 			c.setError(fmt.Errorf("can't create storage trie: %v", err))
 		}
 	}
@@ -160,7 +160,7 @@ func (c *stateObject) getTrie(db Database) Trie {
 }
 
 // GetState returns a value in account storage.
-func (self *stateObject) GetState(db Database, key common.Hash) common.Hash {
+func (self *stateObject) GetState(db Database, key crypto.Hash) crypto.Hash {
 	value, exists := self.cachedStorage[key]
 	if exists {
 		return value
@@ -169,7 +169,7 @@ func (self *stateObject) GetState(db Database, key common.Hash) common.Hash {
 	enc, err := self.getTrie(db).TryGet(key[:])
 	if err != nil {
 		self.setError(err)
-		return common.Hash{}
+		return crypto.Hash{}
 	}
 	if len(enc) > 0 {
 		_, content, _, err := rlp.Split(enc)
@@ -183,7 +183,7 @@ func (self *stateObject) GetState(db Database, key common.Hash) common.Hash {
 }
 
 // SetState updates a value in account storage.
-func (self *stateObject) SetState(db Database, key, value common.Hash) {
+func (self *stateObject) SetState(db Database, key, value crypto.Hash) {
 	self.db.journal.append(storageChange{
 		account:  &self.address,
 		key:      key,
@@ -192,7 +192,7 @@ func (self *stateObject) SetState(db Database, key, value common.Hash) {
 	self.setState(key, value)
 }
 
-func (self *stateObject) setState(key, value common.Hash) {
+func (self *stateObject) setState(key, value crypto.Hash) {
 	self.cachedStorage[key] = value
 	self.dirtyStorage[key] = value
 }
@@ -202,7 +202,7 @@ func (self *stateObject) updateTrie(db Database) Trie {
 	tr := self.getTrie(db)
 	for key, value := range self.dirtyStorage {
 		delete(self.dirtyStorage, key)
-		if (value == common.Hash{}) {
+		if (value == crypto.Hash{}) {
 			self.setError(tr.TryDelete(key[:]))
 			continue
 		}
@@ -291,7 +291,7 @@ func (self *stateObject) deepCopy(db *StateDB) *stateObject {
 //
 
 // Returns the address of the contract/account
-func (c *stateObject) Address() common.Address {
+func (c *stateObject) Address() accounts.Address {
 	return c.address
 }
 
@@ -303,7 +303,7 @@ func (self *stateObject) Code(db Database) []byte {
 	if bytes.Equal(self.CodeHash(), emptyCodeHash) {
 		return nil
 	}
-	code, err := db.ContractCode(self.addrHash, common.BytesToHash(self.CodeHash()))
+	code, err := db.ContractCode(self.addrHash, crypto.BytesToHash(self.CodeHash()))
 	if err != nil {
 		self.setError(fmt.Errorf("can't load code hash %x: %v", self.CodeHash(), err))
 	}
@@ -311,7 +311,7 @@ func (self *stateObject) Code(db Database) []byte {
 	return code
 }
 
-func (self *stateObject) SetCode(codeHash common.Hash, code []byte) {
+func (self *stateObject) SetCode(codeHash crypto.Hash, code []byte) {
 	prevcode := self.Code(self.db.db)
 	self.db.journal.append(codeChange{
 		account:  &self.address,
@@ -321,7 +321,7 @@ func (self *stateObject) SetCode(codeHash common.Hash, code []byte) {
 	self.setCode(codeHash, code)
 }
 
-func (self *stateObject) setCode(codeHash common.Hash, code []byte) {
+func (self *stateObject) setCode(codeHash crypto.Hash, code []byte) {
 	self.code = code
 	self.data.CodeHash = codeHash[:]
 	self.dirtyCode = true

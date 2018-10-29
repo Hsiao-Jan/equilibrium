@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/kcoin/client/metrics"
+	"github.com/kowala-tech/equilibrium/metrics"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
