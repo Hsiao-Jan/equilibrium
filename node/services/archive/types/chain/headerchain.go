@@ -1,7 +1,6 @@
 package chain
 
 import (
-	"crypto"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
@@ -11,12 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kowala-tech/equilibrium/node/services/archive/types"
-
 	"github.com/kowala-tech/equilibrium/common"
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/log"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
@@ -25,8 +24,6 @@ import (
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
-	chainCfg *Config
-
 	chainDb       database.Database
 	genesisHeader *types.Header
 
@@ -45,7 +42,7 @@ type HeaderChain struct {
 //  getValidator should return the parent's validator
 //  procInterrupt points to the parent's interrupt semaphore
 //  wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb database.Database, chainCfg *Config, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
+func NewHeaderChain(chainDb database.Database, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -54,9 +51,7 @@ func NewHeaderChain(chainDb database.Database, chainCfg *Config, engine consensu
 	}
 
 	hc := &HeaderChain{
-		chainCfg: chainCfg,
-		chainDb:  chainDb,
-
+		chainDb:       chainDb,
 		procInterrupt: procInterrupt,
 		rand:          mrand.New(mrand.NewSource(seed.Int64())),
 		engine:        engine,
@@ -391,9 +386,6 @@ func (hc *HeaderChain) RewindTo(head uint64, delFn DeleteCallback) {
 func (hc *HeaderChain) SetGenesis(head *types.Header) {
 	hc.genesisHeader = head
 }
-
-// Network retrieves the header chain's network settings.
-func (hc *HeaderChain) Network() *Config { return hc.chainCfg }
 
 // Engine retrieves the header chain's consensus engine.
 func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }

@@ -1,8 +1,7 @@
 package chain
 
 import (
-	"crypto"
-
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 )

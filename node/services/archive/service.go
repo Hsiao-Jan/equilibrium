@@ -18,6 +18,7 @@ import (
 	"github.com/kowala-tech/equilibrium/node"
 	"github.com/kowala-tech/equilibrium/node/p2p"
 	"github.com/kowala-tech/equilibrium/node/services/archive/genesis"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types/chain"
 )
 
 const (
@@ -25,17 +26,25 @@ const (
 )
 
 // Service represents the archive service.
-type Service struct{}
+type Service struct {
+	blockChain chain.BlockChain
+}
 
 // New retrieves a new instance of the archive service.
-func New(cfg *Config, ctx *node.Context) (*Service, error) {
+func New(config *Config, ctx *node.Context) (*Service, error) {
 	// @TODO (RGERALDES) add resolve path for ctx (chainDataDirName)
-	chainDB, err := OpenDB(ctx.DataDir(), chainDataDirName, cfg.DatabaseCache, cfg.DatabaseHandles)
+	chainDB, err := OpenDB(ctx.DataDir(), chainDataDirName, config.DatabaseCache, config.DatabaseHandles)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := genesis.Setup(chainDB, cfg.Genesis); err != nil {
+	if err := genesis.Setup(chainDB, config.Genesis); err != nil {
+		return nil, err
+	}
+
+	cacheConfig := &chain.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}}
+	blockChain, err := chain.New(chainDB, cache)
+	if err != nil {
 		return nil, err
 	}
 

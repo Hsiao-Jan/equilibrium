@@ -1,8 +1,7 @@
 package chain
 
 import (
-	"crypto"
-
+	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"

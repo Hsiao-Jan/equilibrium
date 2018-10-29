@@ -1,22 +1,13 @@
 package chain
 
 import (
-	"math/big"
-
-	"github.com/kowala-tech/equilibrium/common/hexutil"
-	"github.com/kowala-tech/equilibrium/crypto"
+	"time"
 )
 
-//go:generate gencodec -type Config -field-override configMarshaling -out gen_config_json.go
-
-// Config represents the chain configuration.
-type Config struct {
-	ChainID *big.Int `json:"chainID" gencodec:"required"`
-
-	// This is only used when marshaling to JSON.
-	Hash *crypto.Hash `json:"hash" rlp:"-"`
-}
-
-type configMarshaling struct {
-	ChainID *hexutil.Big
+// CacheConfig contains the configuration values for the trie caching/pruning
+// that's resident in a blockchain.
+type CacheConfig struct {
+	Disabled      bool          // Whether to disable trie write caching (archive node).
+	TrieNodeLimit int           // Memory limit (MB) at which to flush the current in-memory trie to disk.
+	TrieTimeLimit time.Duration // Time limit after which to flush the current in-memory trie to disk.
 }
