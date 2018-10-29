@@ -23,8 +23,6 @@ import (
 	"sort"
 	"sync"
 
-	"go.uber.org/zap"
-
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
@@ -32,6 +30,7 @@ import (
 	"github.com/kowala-tech/equilibrium/state/accounts"
 	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/equilibrium/state/trie"
+	"go.uber.org/zap"
 )
 
 type revision struct {

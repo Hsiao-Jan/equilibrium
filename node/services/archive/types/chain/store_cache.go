@@ -1,11 +1,11 @@
-package types
+package chain
 
 import (
 	"crypto"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
-	"github.com/kowala-tech/equilibrium/types"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 )
 
 var _ BlockStore = (*Cache)(nil)
@@ -50,7 +50,7 @@ func (cc *Cache) HasHeader(hash crypto.Hash, number uint64) bool {
 	return cc.Store.HasHeader(hc.chainDb, hash, number)
 }
 
-func (cc *Cache) GetHeader(hash crypto.Hash, number uint64) *Header {
+func (cc *Cache) GetHeader(hash crypto.Hash, number uint64) *types.Header {
 	if header, ok := cc.headerCache.Get(hash); ok {
 		return header.(*Header)
 	}
@@ -79,7 +79,7 @@ func (cc *Cache) GetBlockNumber(hash crypto.Hash) *uint64 {
 	return number
 }
 
-func (cc *Cache) GetBlock(hash crypto.Hash, number uint64) *Block {
+func (cc *Cache) GetBlock(hash crypto.Hash, number uint64) *types.Block {
 	if block, ok := cc.blockCache.Get(hash); ok {
 		return block.(*types.Block)
 	}
@@ -102,7 +102,7 @@ func (cc *Cache) HasBlock(hash crypto.Hash, number uint64) bool {
 	return cc.Store.HasBlock(hash, number)
 }
 
-func (cc *Cache) GetBody(hash crypto.Hash) *Body {
+func (cc *Cache) GetBody(hash crypto.Hash) *types.Body {
 	if cached, ok := cc.bodyCache.Get(hash); ok {
 		body := cached.(*types.Body)
 		return body
@@ -145,7 +145,7 @@ func (cs *Cache) PurgeHeaderCaches() {
 	cc.numberCache.Purge()
 }
 
-func (cs *Cache) AddHeader(hash crypto.Hash, header *Header) {
+func (cs *Cache) AddHeader(hash crypto.Hash, header *types.Header) {
 	cs.headerCache.Add(hash, header)
 }
 

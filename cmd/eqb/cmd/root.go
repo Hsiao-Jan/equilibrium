@@ -35,6 +35,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// @TODO (rgeraldes) - review pointer config.
+
 var (
 	// cfgFile represents the config file path.
 	cfgFile string
@@ -61,9 +63,7 @@ var (
 	listenIP string
 
 	// mode specifies if the system should be used in production, development or test mode.
-	mode string 
-
-	currency 
+	mode string
 )
 
 const rootCmdLongDesc = `A longer description that spans multiple lines and likely contains
@@ -101,7 +101,6 @@ func init() {
 	rootCmd.Flags().StringVar(&nodeKey, "identity", "", "path of the p2p host key file")
 	rootCmd.Flags().IntVarP(&listenPort, "port", "p", 32000, "port for incoming connections")
 	rootCmd.Flags().StringVar(&listenIP, "ip", "", "ip used for incoming connections")
-	rootCmd.Flags().StringVar(&listenIP, "mode", network.Production.String(), "network mode")
 
 }
 
@@ -132,8 +131,8 @@ func initConfig() {
 }
 
 type eqbConfig struct {
-	Node   node.Config
-	logger *zap.Logger
+	Node    node.Config
+	Archive archive.Config
 }
 
 func runEQB(cmd *cobra.Command, args []string) error {
@@ -186,10 +185,12 @@ func setBootstrappingNodes(cfg *p2p.Config) {
 	switch {
 	case len(bootstrappingNodes) > 0:
 		urls = bootstrappingNodes
-	case isTestNetwork:
-		urls = params.TestBootstrappingNodes
-	case isDevNetwork:
-		urls = params.DevBootstrappingNodes
+		/*
+			case isTestNetwork:
+				urls = params.TestBootstrappingNodes
+			case isDevNetwork:
+				urls = params.DevBootstrappingNodes
+		*/
 	}
 
 	cfg.BootstrappingNodes = make([]pstore.PeerInfo, 0, len(urls))
@@ -226,14 +227,14 @@ func startNode(stack *node.Node) {
 	}()
 }
 
-func registerServices(stack *node.Node) {
-	registerArchiveService(node)
+func registerServices(cfg *eqbConfig, stack *node.Node) {
+	registerArchiveService(&cfg.Archive, stack)
 	//registerMiningService(node)
 }
 
-func registerArchiveService(stack *node.Node) {
-	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return archive.New(ctx)
+func registerArchiveService(cfg *archive.Config, stack *node.Node) {
+	if err := stack.Register(func(ctx *node.Context) (node.Service, error) {
+		return archive.New(cfg, ctx)
 	}); err != nil {
 		log.Fatal("Failed to register the archive service", zap.Error(err))
 	}

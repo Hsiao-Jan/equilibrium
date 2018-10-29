@@ -15,12 +15,19 @@
 package archive
 
 import (
-	"time"
-
-	"github.com/kowala-tech/kcoin/client/core"
-	"github.com/kowala-tech/kcoin/client/knode/downloader"
+	"github.com/kowala-tech/equilibrium/node/services/archive/genesis"
 )
 
+// Config contains the archive service configurations.
+type Config struct {
+	Genesis *genesis.Genesis
+
+	// Database options
+	DatabaseHandles int
+	DatabaseCache   int
+}
+
+/*
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
 // DefaultConfig contains default settings for use on the Kowala main net.
@@ -30,10 +37,13 @@ var DefaultConfig = Config{
 	TrieCache:     256,
 	TrieTimeout:   60 * time.Minute,
 
-	TxPool: core.DefaultTxPoolConfig,
+	//TxPool: core.DefaultTxPoolConfig,
 }
 
 type Config struct {
+	Genesis *genesis.Genesis
+
+
 	SyncMode downloader.SyncMode
 
 	// The genesis block, which is inserted if the database is empty.
@@ -53,7 +63,7 @@ type Config struct {
 	TrieTimeout        time.Duration
 
 	// Transaction pool options
-	TxPool core.TxPoolConfig
+	//TxPool core.TxPoolConfig
 
 	// Enables tracking of SHA3 preimages in the VM
 	EnablePreimageRecording bool
@@ -61,5 +71,5 @@ type Config struct {
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
 
-	
 }
+*/

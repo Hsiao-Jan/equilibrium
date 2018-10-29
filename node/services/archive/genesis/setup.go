@@ -1,89 +1,111 @@
+// Copyright © 2018 Kowala SEZC <info@kowala.tech>
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package genesis
 
 import (
 	"errors"
+	"math/big"
 
+	"github.com/kowala-tech/equilibrium/state/accounts"
+
+	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/crypto"
-	"github.com/kowala-tech/equilibrium/state"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
-	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network"
+	"github.com/kowala-tech/equilibrium/node/services/archive/types"
+	"github.com/kowala-tech/equilibrium/state"
 )
 
 var (
-	ErrGenesisUnavailable = errors.New("genesis is not available")
+	// ErrGenesisUnavailable is thrown if the genesis has not been provided
+	// given an empty chain database. Kowala has decided to not use a default
+	// genesis since it's an critical step and thus force the user to acknowledge
+	// the problem.
+	ErrGenesisUnavailable = errors.New("genesis not available")
 )
 
-// Genesis defines the initial condittions for a blockchain.
+// Genesis defines the initial condittions for a Kowala blockchain.
 type Genesis struct {
-	Network   *network.Settings `json:"network"   gencodec:"required"`
-	Timestamp uint64			`json:"timestamp" gencodec:"required"`
-	ExtraData string            `json:"extra"`
-	Accounts Accounts			`json:"accounts"  gencodec:"required"`
+	ComputeCapacity  *big.Int `json:"computeCapacity" gencodec:"required"`
+	ComputeUnitPrice *big.Int `json:"computeUnitCost" gencodec:"required"`
+	Timestamp        uint64   `json:"timestamp"       gencodec:"required"`
+	ExtraData        []byte   `json:"extraData"`
+	Accounts         Accounts `json:"accounts"        gencodec:"required"`
 }
 
-func (gen *Genesis) ToBlock(db database.Database) *types.Block{
+// ToBlock converts the genesis into a chain block.
+func (gen *Genesis) ToBlock(db database.Database) (*types.Block, error) {
 	if db == nil {
 		db = database.NewMemDatabase()
 	}
 
-	statedb, _ := state.New(crypto.Hash{}, state.NewDatabase(db))
-	for addr, account := range g.Accounts {
-		statedb.AddBalance(addr, account.Balance)
-		statedb.SetCode(addr, account.Code)
-		statedb.SetNonce(addr, account.Nonce)
+	stateDB, _ := state.New(crypto.Hash{}, state.NewDatabase(db))
+	for addr, account := range gen.Accounts {
+		if account.Balance == nil {
+			account.Balance = common.Big0
+		}
+		stateDB.AddBalance(addr, account.Balance)
+		stateDB.SetCode(addr, account.Code)
 		for key, value := range account.Storage {
-			statedb.SetState(addr, key, value)
+			stateDB.SetState(addr, key, value)
 		}
 	}
-	root := statedb.IntermediateRoot(false)
-	head := &types.Header{
-		Number:     new(big.Int).SetUint64(g.Number),
-		Time:       new(big.Int).SetUint64(g.Timestamp),
-		PreviousBlockHash: g.ParentHash,
-		Extra:      g.ExtraData,
-		GasLimit:   g.GasLimit,
-		GasUsed:    g.GasUsed,
-		Coinbase:   g.Coinbase,
-		Root:       root,
-	}
-	if g.GasLimit == 0 {
-		head.GasLimit = params.GenesisGasLimit
-	}
-	statedb.Commit(false)
-	statedb.Database().TrieDB().Commit(root, true)
 
-	return types.NewBlock(head, nil, nil, nil)
+	root := stateDB.IntermediateRoot(false)
+
+	head := &types.Header{
+		Number:            common.Big0,
+		Time:              new(big.Int).SetUint64(gen.Timestamp),
+		PreviousBlockHash: crypto.Hash{},
+		Extra:             gen.ExtraData,
+		Proposer:          accounts.Address{},
+		Snapshot:          root,
+	}
+
+	stateDB.Commit(false)
+	stateDB.Database().TrieDB().Commit(root, true)
+
+	return types.NewBlock(head, nil, nil, nil, nil)
 }
 
 // Setup writes the genesis block and returns the network settings.
-func Setup(db database.Database, newGenesis *Genesis) (*network.Settings, error) {
-	stored := rawdb.ReadCanonicalHash(db, 0) 
+func Setup(db database.Database, gen *Genesis) error {
+	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == crypto.Hash{}) {
 		// Force the user to acknowledge the genesis instead of using a
 		// default genesis since it's a vital operation.
-		if newGenesis == nil {
-			return nil, ErrGenesisUnavailable
+		if gen == nil {
+			return ErrGenesisUnavailable
 		}
 
-		log.Info("Writing block")
-		genesisBlock := newGenesis.ToBlock()
-		commit(db, genesisBlock)
+		log.Info("Writing genesis block...")
+		block, err := gen.ToBlock(db)
+		if err != nil {
+			return err
+		}
+		commit(db, block)
 
-		log.Info("Writing network settings")
-		rawdb.WriteNetworkSettings(db, block.Hash(), newGenesis.Network)
-
-		return newGenesis.Config, err
+		return nil
 	}
 
-	if newGenesis != nil {
-		log.Info("provided genesis ignored - db not empty")
+	if gen != nil {
+		log.Info("Failed to use new genesis; db not empty")
 	}
 
-	// Get the existing network settings.
-	return rawdb.ReadNetworkSettings(db, stored), nil
+	return nil
 }
 
 func commit(db database.Database, block *types.Block) {

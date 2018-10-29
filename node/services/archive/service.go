@@ -15,10 +15,8 @@
 package archive
 
 import (
-	"github.com/kowala-tech/equilibrium/database"
-	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network"
 	"github.com/kowala-tech/equilibrium/node"
+	"github.com/kowala-tech/equilibrium/node/p2p"
 	"github.com/kowala-tech/equilibrium/node/services/archive/genesis"
 )
 
@@ -27,41 +25,22 @@ const (
 )
 
 // Service represents the archive service.
-type Service struct {
-	network *network.Settings
-}
+type Service struct{}
 
 // New retrieves a new instance of the archive service.
-func New(cfg *Config, ctx *node.Context) (*node.Service, error) {
-	// @TODO (RGERALDES) add resolve path for ctx
+func New(cfg *Config, ctx *node.Context) (*Service, error) {
+	// @TODO (RGERALDES) add resolve path for ctx (chainDataDirName)
 	chainDB, err := OpenDB(ctx.DataDir(), chainDataDirName, cfg.DatabaseCache, cfg.DatabaseHandles)
 	if err != nil {
 		return nil, err
 	}
 
-	settings, err := genesis.Setup(chainDb, cfg.Genesis)
-	if err != nil {
+	if err := genesis.Setup(chainDB, cfg.Genesis); err != nil {
 		return nil, err
 	}
 
-	return &Service{
-		network: settings,
-	}, nil
-
-	log.Info("Created the archive service")
+	return &Service{}, nil
 }
 
-// OpenDB creates the chain database.
-func OpenDB(dataDir string, name string, cache int, handles int) (database.Database, error) {
-	if dataDir == "" {
-		return database.NewMemDatabase(), nil
-	}
-
-	db, err := database.NewLDBDatabase(name, cache, handles)
-	if err != nil {
-		return nil, err
-	}
-	db.Meter("kcoin/db/chaindata/")
-
-	return db, nil
-}
+func (arc *Service) Start(server *p2p.Host) error { return nil }
+func (arc *Service) Stop() error                  { return nil }

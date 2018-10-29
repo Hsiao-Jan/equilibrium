@@ -1,4 +1,4 @@
-package types
+package chain
 
 import (
 	"crypto"
@@ -11,14 +11,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kowala-tech/equilibrium/network/params"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types"
 
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network"
 	"github.com/kowala-tech/kcoin/client/consensus"
 )
 
@@ -27,7 +25,7 @@ import (
 // It is not thread safe either, the encapsulating chain structures should do
 // the necessary mutex locking/unlocking.
 type HeaderChain struct {
-	network *network.Settings
+	chainCfg *Config
 
 	chainDb       database.Database
 	genesisHeader *types.Header
@@ -47,7 +45,7 @@ type HeaderChain struct {
 //  getValidator should return the parent's validator
 //  procInterrupt points to the parent's interrupt semaphore
 //  wg points to the parent's shutdown wait group
-func NewHeaderChain(chainDb database.Database, network *params.Network, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
+func NewHeaderChain(chainDb database.Database, chainCfg *Config, engine consensus.Engine, procInterrupt func() bool) (*HeaderChain, error) {
 
 	// Seed a fast but crypto originating random generator
 	seed, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
@@ -56,8 +54,8 @@ func NewHeaderChain(chainDb database.Database, network *params.Network, engine c
 	}
 
 	hc := &HeaderChain{
-		network: network,
-		chainDb: chainDb,
+		chainCfg: chainCfg,
+		chainDb:  chainDb,
 
 		procInterrupt: procInterrupt,
 		rand:          mrand.New(mrand.NewSource(seed.Int64())),
@@ -94,7 +92,7 @@ func (hc *HeaderChain) GetBlockNumber(hash crypto.Hash) *uint64 {
 // without the real blocks. Hence, writing headers directly should only be done
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
-func (hc *HeaderChain) WriteHeader(header *Header) (status WriteStatus, err error) {
+func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, err error) {
 	// Cache some values to prevent constant recalculation
 	var (
 		hash   = header.Hash()
@@ -159,9 +157,9 @@ func (hc *HeaderChain) WriteHeader(header *Header) (status WriteStatus, err erro
 // processed and light chain events sent, while in a BlockChain this is not
 // necessary since chain events are sent after inserting blocks. Second, the
 // header writes should be protected by the parent chain mutex individually.
-type WhCallback func(*Header) error
+type WhCallback func(*types.Header) error
 
-func (hc *HeaderChain) ValidateHeaderChain(chain []*Header, checkFreq int) (int, error) {
+func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
@@ -216,7 +214,7 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*Header, checkFreq int) (int,
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verfy nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (hc *HeaderChain) InsertHeaderChain(chain []*Header, writeHeader WhCallback, start time.Time) (int, error) {
+func (hc *HeaderChain) InsertHeaderChain(chain []*types.Header, writeHeader WhCallback, start time.Time) (int, error) {
 	// Collect some import statistics to report on
 	stats := struct{ processed, ignored int }{}
 	// All headers passed verification, import them into the database
@@ -306,13 +304,13 @@ func (hc *HeaderChain) GetAncestor(hash crypto.Hash, number, ancestor uint64, ma
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (hc *HeaderChain) GetHeader(hash crypto.Hash, number uint64) *Header {
+func (hc *HeaderChain) GetHeader(hash crypto.Hash, number uint64) *types.Header {
 	return hc.store.GetHeader(hash, Number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (hc *HeaderChain) GetHeaderByHash(hash crypto.Hash) *Header {
+func (hc *HeaderChain) GetHeaderByHash(hash crypto.Hash) *types.Header {
 	number := hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -327,7 +325,7 @@ func (hc *HeaderChain) HasHeader(hash crypto.Hash, number uint64) bool {
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
-func (hc *HeaderChain) GetHeaderByNumber(number uint64) *Header {
+func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
 	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
 	if hash == (Hash{}) {
 		return nil
@@ -337,12 +335,12 @@ func (hc *HeaderChain) GetHeaderByNumber(number uint64) *Header {
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
-func (hc *HeaderChain) CurrentHeader() *Header {
-	return hc.currentHeader.Load().(*Header)
+func (hc *HeaderChain) CurrentHeader() *types.Header {
+	return hc.currentHeader.Load().(*types.Header)
 }
 
 // SetCurrentHeader sets the current head header of the canonical chain.
-func (hc *HeaderChain) SetCurrentHeader(head *Header) {
+func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash())
 
 	hc.currentHeader.Store(head)
@@ -390,18 +388,18 @@ func (hc *HeaderChain) RewindTo(head uint64, delFn DeleteCallback) {
 }
 
 // SetGenesis sets a new genesis block header for the chain
-func (hc *HeaderChain) SetGenesis(head *Header) {
+func (hc *HeaderChain) SetGenesis(head *types.Header) {
 	hc.genesisHeader = head
 }
 
 // Network retrieves the header chain's network settings.
-func (hc *HeaderChain) Network() *params.Network { return hc.network }
+func (hc *HeaderChain) Network() *Config { return hc.chainCfg }
 
 // Engine retrieves the header chain's consensus engine.
 func (hc *HeaderChain) Engine() consensus.Engine { return hc.engine }
 
 // GetBlock implements consensus.ChainReader, and returns nil for every input as
 // a header chain does not have blocks available for retrieval.
-func (hc *HeaderChain) GetBlock(hash crypto.Hash, number uint64) *Block {
+func (hc *HeaderChain) GetBlock(hash crypto.Hash, number uint64) *types.Block {
 	return nil
 }

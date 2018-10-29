@@ -17,12 +17,9 @@
 package rawdb
 
 import (
-	"encoding/json"
-
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network"
 	"go.uber.org/zap"
 )
 
@@ -41,34 +38,6 @@ func WriteDatabaseVersion(db DatabaseWriter, version int) {
 	enc, _ := rlp.EncodeToBytes(version)
 	if err := db.Put(databaseVerisionKey, enc); err != nil {
 		log.Fatal("Failed to store the database version", zap.Error(err))
-	}
-}
-
-// ReadNetworkSettings retrieves the network settings based on the given genesis hash.
-func ReadNetworkSettings(db DatabaseReader, hash crypto.Hash) *network.Settings {
-	data, _ := db.Get(configKey(hash))
-	if len(data) == 0 {
-		return nil
-	}
-	var config network.Settings
-	if err := json.Unmarshal(data, &config); err != nil {
-		log.Error("Invalid chain config JSON", zap.String("hash", hash.String()), zap.Error(err))
-		return nil
-	}
-	return &config
-}
-
-// WriteNetworkSettings writes the network settings to the database.
-func WriteNetworkSettings(db DatabaseWriter, hash crypto.Hash, cfg *network.Settings) {
-	if cfg == nil {
-		return
-	}
-	data, err := json.Marshal(cfg)
-	if err != nil {
-		log.Fatal("Failed to JSON encode chain config", zap.Error(err))
-	}
-	if err := db.Put(configKey(hash), data); err != nil {
-		log.Fatal("Failed to store chain config", zap.Error(err))
 	}
 }
 

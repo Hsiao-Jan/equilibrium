@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package types
+package chain
 
 import (
 	"errors"
@@ -31,7 +31,6 @@ import (
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/log"
-	"github.com/kowala-tech/equilibrium/network"
 	"github.com/kowala-tech/equilibrium/node/event"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/state"
@@ -113,8 +112,8 @@ type BlockChain struct {
 	chainmu sync.RWMutex // blockchain insertion lock.
 	procmu  sync.RWMutex // block processor lock.
 
-	network     *network.Settings // network configuration.
-	cacheConfig *CacheConfig    // Cache configuration for pruning.
+	chainCfg     *Config // network configuration.
+	cacheCfg *CacheConfig    // Cache configuration for pruning.
 
 	running          int32
 	genesisBlock     *types.Block
@@ -154,7 +153,7 @@ type BlockChain struct {
 
 // New returns a fully initialised block chain using information
 // available in the database.
-func New(db database.Database, cacheConfig *CacheConfig, network *network.Settings, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func New(db database.Database, cacheCfg *CacheConfig, chainCfg *Config, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -165,8 +164,8 @@ func New(db database.Database, cacheConfig *CacheConfig, network *network.Settin
 	badBlocks, _ := lru.New(badBlockLimit)
 
 	bc := &BlockChain{
-		network:     network,
-		cacheConfig: cacheConfig,
+		chainCfg:     chainCfg,
+		cacheConfig: cacheCfg,
 		db:          db,
 		triegc:      prque.New(),
 		stateCache:  state.NewDatabase(db),
@@ -328,13 +327,13 @@ func (bc *BlockChain) FastSyncCommitHead(hash crypto.Hash) error {
 
 // CurrentBlock retrieves the current head block of the canonical chain. The
 // block is retrieved from the blockchain's internal cache.
-func (bc *BlockChain) CurrentBlock() *Block {
+func (bc *BlockChain) CurrentBlock() *types.Block {
 	return bc.currentBlock.Load().(*Block)
 }
 
 // CurrentFastBlock retrieves the current fast-sync head block of the canonical
 // chain. The block is retrieved from the blockchain's internal cache.
-func (bc *BlockChain) CurrentFastBlock() *Block {
+func (bc *BlockChain) CurrentFastBlock() *types.Block {
 	return bc.currentFastBlock.Load().(*Block)
 }
 
@@ -383,7 +382,7 @@ func (bc *BlockChain) Reset() error {
 
 // ResetWithGenesisBlock purges the entire blockchain, restoring it to the
 // specified genesis state.
-func (bc *BlockChain) ResetWithGenesisBlock(genesis *Block) error {
+func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	// Dump the entire block chain and purge the caches
 	if err := bc.RewindTo(0); err != nil {
 		return err
@@ -409,7 +408,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *Block) error {
 //
 // This method only rolls back the current block. The current header and current
 // fast block are left intact.
-func (bc *BlockChain) repair(head **Block) error {
+func (bc *BlockChain) repair(head **types.Block) error {
 	for {
 		// Abort if we've rewound to a head block that does have associated state
 		if _, err := state.New((*head).Root(), bc.stateCache); err == nil {
@@ -454,7 +453,7 @@ func (bc *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // assumes that the block is indeed a true head. It will also reset the head
 // header and the head fast sync block to this very same block if they are older.
 // Note, this function assumes that the `mu` mutex is held!
-func (bc *BlockChain) insert(block *Block) {
+func (bc *BlockChain) insert(block *types.Block) {
 	// unknown block
 	updateHeads := rawdb.ReadCanonicalHash(bc.db, block.NumberU64()) != block.Hash()
 
@@ -474,13 +473,13 @@ func (bc *BlockChain) insert(block *Block) {
 }
 
 // Genesis retrieves the chain's genesis block.
-func (bc *BlockChain) Genesis() *Block {
+func (bc *BlockChain) Genesis() *types.Block {
 	return bc.genesisBlock
 }
 
 // GetBody retrieves a block body (transactions, pre-commits and protocol violations)
 // from the database by hash, caching it if found.
-func (bc *BlockChain) GetBody(hash crypto.Hash) *Body {
+func (bc *BlockChain) GetBody(hash crypto.Hash) *types.Body {
 	return bc.store.GetBody(hash)
 }
 
@@ -514,12 +513,12 @@ func (bc *BlockChain) HasBlockAndState(hash crypto.Hash, number uint64) bool {
 
 // GetBlock retrieves a block from the database by hash and number,
 // caching it if found.
-func (bc *BlockChain) GetBlock(hash crypto.Hash, number uint64) *Block {
+func (bc *BlockChain) GetBlock(hash crypto.Hash, number uint64) *types.Block {
 	bc.store.GetBlock(hash, number)
 }
 
 // GetBlockByHash retrieves a block from the database by hash, caching it if found.
-func (bc *BlockChain) GetBlockByHash(hash crypto.Hash) *Block {
+func (bc *BlockChain) GetBlockByHash(hash crypto.Hash) *types.Block {
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -529,7 +528,7 @@ func (bc *BlockChain) GetBlockByHash(hash crypto.Hash) *Block {
 
 // GetBlockByNumber retrieves a block from the database by number, caching it
 // (associated with its hash) if found.
-func (bc *BlockChain) GetBlockByNumber(number uint64) *Block {
+func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	hash := rawdb.ReadCanonicalHash(bc.db, number)
 	if hash == (Hash{}) {
 		return nil
@@ -548,7 +547,7 @@ func (bc *BlockChain) GetReceiptsByHash(hash crypto.Hash) transaction.Receipts {
 
 // GetBlocksFromHash returns the block corresponding to hash and up to n-1 ancestors.
 // [deprecated by eth/62]
-func (bc *BlockChain) GetBlocksFromHash(hash crypto.Hash, n int) (blocks []*Block) {
+func (bc *BlockChain) GetBlocksFromHash(hash crypto.Hash, n int) (blocks []*types.Block) {
 	number := bc.hc.GetBlockNumber(hash)
 	if number == nil {
 		return nil
@@ -664,7 +663,7 @@ func (bc *BlockChain) Rollback(chain []crypto.Hash) {
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
-func SetReceiptsData(network *params.Network, block *Block, receipts transaction.Receipts) error {
+func SetReceiptsData(chainCfg *Config, block *types.Block, receipts transaction.Receipts) error {
 	signer := crypto.MakeSigner(config, block.Number())
 
 	transactions, logIndex := block.Transactions(), uint(0)
@@ -698,7 +697,7 @@ func SetReceiptsData(network *params.Network, block *Block, receipts transaction
 
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
-func (bc *BlockChain) InsertReceiptChain(blockChain Blocks, receiptChain []transaction.Receipts) (int, error) {
+func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []transaction.Receipts) (int, error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -784,7 +783,7 @@ var lastWrite uint64
 
 // WriteBlockWithState writes the block and all associated state to the database.
 // Note: WriteBlockWithState assumes that the block has been validated already.
-func (bc *BlockChain) WriteBlockWithState(block *Block, receipts []*transaction.Receipt, state *state.StateDB) (err error) {
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*transaction.Receipt, state *state.StateDB) (err error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -867,7 +866,7 @@ func (bc *BlockChain) WriteBlockWithState(block *Block, receipts []*transaction.
 	return nil
 }
 
-func (bc *BlockChain) doReorg(block *Block, currentBlock *Block, batch database.Batch, state *state.StateDB) (WriteStatus, error) {
+func (bc *BlockChain) doReorg(block *types.Block, currentBlock *types.Block, batch database.Batch, state *state.StateDB) (WriteStatus, error) {
 	// Reorganise the chain if the parent is not the head block
 	if !currentBlock.IsParent(block) {
 		if err := bc.reorg(currentBlock, block); err != nil {
@@ -879,7 +878,7 @@ func (bc *BlockChain) doReorg(block *Block, currentBlock *Block, batch database.
 }
 
 // writePositionalMetadata Write the positional metadata for transaction/receipt lookups and preimages
-func writePositionalMetadata(batch database.Batch, block *Block, state *state.StateDB) {
+func writePositionalMetadata(batch database.Batch, block *types.Block, state *state.StateDB) {
 	rawdb.WriteTxLookupEntries(batch, block)
 	rawdb.WritePreimages(batch, block.NumberU64(), state.Preimages())
 }
@@ -889,7 +888,7 @@ func writePositionalMetadata(batch database.Batch, block *Block, state *state.St
 // block as well an error describing what went wrong.
 //
 // After insertion is done, all accumulated events will be fired.
-func (bc *BlockChain) InsertChain(chain Blocks) (int, error) {
+func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	n, events, logs, err := bc.insertChain(chain)
 	bc.PostChainEvents(events, logs)
 	return n, err
@@ -898,7 +897,7 @@ func (bc *BlockChain) InsertChain(chain Blocks) (int, error) {
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(chain Blocks) (int, []interface{}, []*transaction.Log, error) {
+func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*transaction.Log, error) {
 	// Sanity check that we have something meaningful to import
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1071,7 +1070,7 @@ const statsReportLimit = 8 * time.Second
 
 // report prints statistics if some number of blocks have been processed
 // or more than a few seconds have passed since the last message.
-func (st *insertStats) report(chain []*Block, index int, cache common.StorageSize) {
+func (st *insertStats) report(chain []*types.Block, index int, cache common.StorageSize) {
 	// Fetch the timings for the batch
 	var (
 		now     = mclock.Now()
@@ -1100,7 +1099,7 @@ func (st *insertStats) report(chain []*Block, index int, cache common.StorageSiz
 	}
 }
 
-func countTransactions(chain []*Block) (c int) {
+func countTransactions(chain []*types.Block) (c int) {
 	for _, b := range chain {
 		c += len(b.Transactions())
 	}
@@ -1140,7 +1139,7 @@ func (bc *BlockChain) update() {
 }
 
 // BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
-func (bc *BlockChain) BadBlocks() []*Block {
+func (bc *BlockChain) BadBlocks() []*types.Block {
 	blocks := make([]*Block, 0, bc.badBlocks.Len())
 	for _, hash := range bc.badBlocks.Keys() {
 		if blk, exist := bc.badBlocks.Peek(hash); exist {
@@ -1152,12 +1151,12 @@ func (bc *BlockChain) BadBlocks() []*Block {
 }
 
 // addBadBlock adds a bad block to the bad-block LRU cache
-func (bc *BlockChain) addBadBlock(block *Block) {
+func (bc *BlockChain) addBadBlock(block *types.Block) {
 	bc.badBlocks.Add(block.Hash(), block)
 }
 
 // reportBlock logs a bad block error.
-func (bc *BlockChain) reportBlock(block *Block, receipts transaction.Receipts, err error) {
+func (bc *BlockChain) reportBlock(block *types.Block, receipts transaction.Receipts, err error) {
 	bc.addBadBlock(block)
 
 	var receiptString string
@@ -1189,7 +1188,7 @@ Error: %v
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verify nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(chain []*Header, checkFreq int) (int, error) {
+func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	start := time.Now()
 	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
 		return i, err
@@ -1221,7 +1220,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*Header, checkFreq int) (int, er
 // without the real blocks. Hence, writing headers directly should only be done
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
-func (bc *BlockChain) writeHeader(header *Header) error {
+func (bc *BlockChain) writeHeader(header *types.Header) error {
 	bc.wg.Add(1)
 	bc.mu.Lock()
 
@@ -1235,19 +1234,19 @@ func (bc *BlockChain) writeHeader(header *Header) error {
 
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
-func (bc *BlockChain) CurrentHeader() *Header {
+func (bc *BlockChain) CurrentHeader() *types.Header {
 	return bc.hc.CurrentHeader()
 }
 
 // GetHeader retrieves a block header from the database by hash and number,
 // caching it if found.
-func (bc *BlockChain) GetHeader(hash crypto.Hash, number uint64) *Header {
+func (bc *BlockChain) GetHeader(hash crypto.Hash, number uint64) *types.Header {
 	return bc.hc.GetHeader(hash, number)
 }
 
 // GetHeaderByHash retrieves a block header from the database by hash, caching it if
 // found.
-func (bc *BlockChain) GetHeaderByHash(hash crypto.Hash) *Header {
+func (bc *BlockChain) GetHeaderByHash(hash crypto.Hash) *types.Header {
 	return bc.hc.GetHeaderByHash(hash)
 }
 
@@ -1277,12 +1276,12 @@ func (bc *BlockChain) GetAncestor(hash crypto.Hash, number, ancestor uint64, max
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
-func (bc *BlockChain) GetHeaderByNumber(number uint64) *Header {
+func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 	return bc.hc.GetHeaderByNumber(number)
 }
 
-// Network retrieves the blockchain's network settings.
-func (bc *BlockChain) Network() *params.Network { return bc.network }
+// Network retrieves the blockchain's chain configuration.
+func (bc *BlockChain) ChainConfig() *Config { return bc.chainCfg }
 
 // Engine retrieves the blockchain's consensus engine.
 func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }

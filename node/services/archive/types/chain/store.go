@@ -1,4 +1,4 @@
-package types
+package chain
 
 import (
 	"crypto"
@@ -17,10 +17,10 @@ const (
 
 type BlockStore interface {
 	HeaderStore
-	GetBody(hash crypto.Hash) *Body
+	GetBody(hash crypto.Hash) *types.Body
 	GetBodyRLP(hash crypto.Hash) rlp.RawValue
 	HasBlock(hash crypto.Hash, number uint64) bool
-	GetBlock(hash crypto.Hash, number uint64) *Block
+	GetBlock(hash crypto.Hash, number uint64) *types.Block
 	PurgeBlockCaches()
 }
 
