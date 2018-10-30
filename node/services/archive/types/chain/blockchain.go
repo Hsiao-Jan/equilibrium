@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"github.com/kowala-tech/equilibrium/crypto/signer"
 	"errors"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/golang-lru"
 	"github.com/kowala-tech/equilibrium/common"
-	"github.com/kowala-tech/equilibrium/common/mclock"
 	"github.com/kowala-tech/equilibrium/crypto"
 	"github.com/kowala-tech/equilibrium/database"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
@@ -20,6 +20,7 @@ import (
 	"github.com/kowala-tech/equilibrium/node/event"
 	"github.com/kowala-tech/equilibrium/database/rawdb"
 	"github.com/kowala-tech/equilibrium/state"
+	"github.com/kowala-tech/equilibrium/state/accounts"
 	"github.com/kowala-tech/equilibrium/state/accounts/transaction"
 	"github.com/kowala-tech/equilibrium/state/trie"
 	"github.com/kowala-tech/equilibrium/node/services/archive/types"
@@ -29,9 +30,6 @@ import (
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
-var (
-	errNoGenesis = errors.New("Genesis not found in chain")
-)
 
 var (
 //blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
@@ -153,7 +151,7 @@ func New(db database.Database, cacheConfig *CacheConfig, engine consensus.Engine
 
 	bc.genesisBlock = bc.GetBlockByNumber(0)
 	if bc.genesisBlock == nil {
-		return nil, errNoGenesis
+		return nil, ErrNoGenesis
 	}
 	if err := bc.loadState(); err != nil {
 		return nil, err
@@ -630,7 +628,7 @@ func (bc *BlockChain) Rollback(chain []crypto.Hash) {
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
 func SetReceiptsData(block *types.Block, receipts transaction.Receipts) error {
-	signer := crypto.newsigner
+	signer := signer.NewProductionSigner()
 
 	transactions, logIndex := block.Transactions(), uint(0)
 	if len(transactions) != len(receipts) {
@@ -645,7 +643,7 @@ func SetReceiptsData(block *types.Block, receipts transaction.Receipts) error {
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
 			from, _ := types.TxSender(signer, transactions[j])
-			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
+			receipts[j].ContractAddress = accounts.CreateAddress(from, transactions[j].Nonce())
 		}
 
 		// The derived log fields can simply be set from the block and transaction
@@ -670,8 +668,8 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(blockChain); i++ {
 		if blockChain[i].NumberU64() != blockChain[i-1].NumberU64()+1 || blockChain[i].PreviousBlockHash() != blockChain[i-1].Hash() {
-			log.Error("Non contiguous receipt insert", "number", blockChain[i].Number(), "hash", blockChain[i].Hash(), "parent", blockChain[i].PreviousBlockHash(),
-				"prevnumber", blockChain[i-1].Number(), "prevhash", blockChain[i-1].Hash())
+			log.Error("Non contiguous receipt insert", zap.String("number", blockChain[i].Number().String()), zap.String("hash", blockChain[i].Hash().String()), zap.String("parent", blockChain[i].PreviousBlockHash().String()),
+				zap.String("prevnumber", blockChain[i-1].Number().String()), zap.String("prevhash", blockChain[i-1].Hash().String()))
 			return 0, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, blockChain[i-1].NumberU64(),
 				blockChain[i-1].Hash().Bytes()[:4], i, blockChain[i].NumberU64(), blockChain[i].Hash().Bytes()[:4], blockChain[i].PreviousBlockHash().Bytes()[:4])
 		}
@@ -699,7 +697,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			continue
 		}
 		// Compute all the non-consensus fields of the receipts
-		if err := SetReceiptsData(bc.chainConfig, block, receipts); err != nil {
+		if err := SetReceiptsData(block, receipts); err != nil {
 			return i, fmt.Errorf("failed to set receipts data: %v", err)
 		}
 		// Write all the data out into the database
@@ -736,12 +734,12 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	bc.mu.Unlock()
 
 	log.Info("Imported new block receipts",
-		"count", stats.processed,
-		"elapsed", common.PrettyDuration(time.Since(start)),
-		"number", head.Number(),
-		"hash", head.Hash(),
-		"size", common.StorageSize(bytes),
-		"ignored", stats.ignored)
+		zap.Int32("count", stats.processed),
+		zap.String("elapsed", common.PrettyDuration(time.Since(start)).String()),
+		zap.String("number", head.Number().String()),
+		zap.String("hash", head.Hash().String()),
+		zap.Float64("size", float64(common.StorageSize(bytes))),
+		zap.Int32("ignored", stats.ignored))
 	return 0, nil
 }
 
@@ -773,7 +771,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*transa
 		}
 	} else {
 		// Full but not archive node, do proper garbage collection
-		triedb.Reference(root, Hash{}) // metadata reference to keep trie alive
+		triedb.Reference(root, crypto.Hash{}) // metadata reference to keep trie alive
 		bc.triegc.Push(root, -float32(block.NumberU64()))
 
 		if current := block.NumberU64(); current > triesInMemory {
@@ -794,10 +792,10 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*transa
 				// If we're exceeding limits but haven't reached a large enough memory gap,
 				// warn the user that the system is becoming unstable.
 				if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", bc.cacheConfig.TrieTimeLimit, "optimum", float64(chosen-lastWrite)/triesInMemory)
+					log.Info("State in memory for too long, committing", zap.Duration("time", bc.gcproc), zap.Duration("allowance", bc.cacheConfig.TrieTimeLimit), zap.Float64("optimum", float64(chosen-lastWrite)/triesInMemory))
 				}
 				// Flush an entire trie and restart the counters
-				triedb.Commit(header.Root, true)
+				triedb.Commit(header.Snapshot, true)
 				lastWrite = chosen
 				bc.gcproc = 0
 			}
@@ -808,7 +806,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*transa
 					bc.triegc.Push(root, number)
 					break
 				}
-				triedb.Dereference(root.(Hash))
+				triedb.Dereference(root.(crypto.Hash))
 			}
 		}
 	}
@@ -830,17 +828,6 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*transa
 	bc.futureBlocks.Remove(block.Hash())
 
 	return nil
-}
-
-func (bc *BlockChain) doReorg(block *types.Block, currentBlock *types.Block, batch database.Batch, state *state.StateDB) (WriteStatus, error) {
-	// Reorganise the chain if the parent is not the head block
-	if !currentBlock.IsParent(block) {
-		if err := bc.reorg(currentBlock, block); err != nil {
-			return NonStatTy, err
-		}
-	}
-	writePositionalMetadata(batch, block, state)
-	return CanonStatTy, nil
 }
 
 // writePositionalMetadata Write the positional metadata for transaction/receipt lookups and preimages
@@ -872,8 +859,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].PreviousBlockHash() != chain[i-1].Hash() {
 			// Chain broke ancestry, log a message (programming error) and skip insertion
-			log.Error("Non contiguous block insert", "number", chain[i].Number(), "hash", chain[i].Hash(),
-				"parent", chain[i].PreviousBlockHash(), "prevnumber", chain[i-1].Number(), "prevhash", chain[i-1].Hash())
+			log.Error("Non contiguous block insert", zap.String("number", chain[i].Number().String()), zap.String("hash", chain[i].Hash().String()),
+				zap.String("previous block", chain[i].PreviousBlockHash().String()), zap.String("prevnumber", chain[i-1].Number().String()), zap.String("prevhash", chain[i-1].Hash().String()))
 
 			return 0, nil, nil, fmt.Errorf("non contiguous insert: item %d is #%d [%x…], item %d is #%d [%x…] (parent [%x…])", i-1, chain[i-1].NumberU64(),
 				chain[i-1].Hash().Bytes()[:4], i, chain[i].NumberU64(), chain[i].Hash().Bytes()[:4], chain[i].PreviousBlockHash().Bytes()[:4])
@@ -890,9 +877,9 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 	// faster than direct delivery and requires much less mutex
 	// acquiring.
 	var (
-		stats         = insertStats{startTime: mclock.Now()}
+		//stats         = insertStats{startTime: mclock.Now()}
 		events        = make([]interface{}, 0, len(chain))
-		lastCanon     *Block
+		lastCanon     *types.Block
 		coalescedLogs []*transaction.Log
 	)
 	// Start the parallel header verifier
@@ -907,7 +894,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 	defer close(abort)
 
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
-	senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number()), chain)
+	senderCacher.recoverFromBlocks(signer.NewProductionSigner(), chain)
 
 	// Iterate over the blocks and insert when the verifier permits
 	for i, block := range chain {
@@ -928,7 +915,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 			// Block and state both already known. However if the current block is below
 			// this number we did a rollback and we should reimport it nonetheless.
 			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
-				stats.ignored++
+				//stats.ignored++
 				continue
 			}
 
@@ -940,15 +927,15 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 				return i, events, coalescedLogs, fmt.Errorf("future block: %v > %v", block.Time(), max)
 			}
 			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
+			//stats.queued++
 			continue
 
 		case err == consensus.ErrUnknownAncestor && bc.futureBlocks.Contains(block.PreviousBlockHash()):
 			bc.futureBlocks.Add(block.Hash(), block)
-			stats.queued++
+			//stats.queued++
 			continue
 		case err != nil:
-			log.Error("insert chain error while bc.engine.VerifyHeaders of a block", "err", err.Error())
+			log.Error("insert chain error while bc.engine.VerifyHeaders of a block", zap.String("err", err.Error()))
 			bc.reportBlock(block, nil, err)
 			return i, events, coalescedLogs, err
 		}
@@ -960,33 +947,34 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 		} else {
 			parent = chain[i-1]
 		}
-		state, err := state.New(parent.Root(), bc.stateCache)
+		state, err := state.New(parent.Snapshot(), bc.stateCache)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
 		receipts, logs, requiredEffort, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
-			log.Debug("insert chain error while bc.processor.Process of a block", "err", err.Error())
+			log.Debug("insert chain error while bc.processor.Process of a block", zap.String("err", err.Error()))
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 		// Validate the state using the default validator
 		err = bc.Validator().ValidateState(block, parent, state, receipts, requiredEffort)
 		if err != nil {
-			log.Debug("insert chain error while bc.Validator().ValidateState of a block", "data", spew.Sdump(
-				block.ReceivedFrom,
-				block.ReceivedAt,
+			log.Debug("insert chain error while bc.Validator().ValidateState of a block", zap.String("data", spew.Sdump(
+				// @TODO (rgeraldes)
+				//block.ReceivedFrom,
+				//block.ReceivedAt,
 				block.Header().Number,
-				block.Header().ValidatorsHash,
-				block.Header().TxHash,
 				block.Header().PreviousBlockHash,
-				block.Header().Root,
+				block.Header().Extra,
+				block.Header().LastCommitHash,
+				block.Header().TxHash,
+				block.Header().Snapshot,
 				parent.Header().Number,
-				parent.Header().ValidatorsHash,
+				parent.Header().ProtocolViolationHash,
 				parent.Header().TxHash,
-				parent.Header().Root,
-				requiredEffort))
+				requiredEffort)))
 
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -998,8 +986,8 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 			return i, events, coalescedLogs, err
 		}
 
-		log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(),
-			"txs", len(block.Transactions()), "elapsed", common.PrettyDuration(time.Since(bstart)))
+		log.Debug("Inserted new block", zap.String("number", block.Number().String()), zap.String("hash", block.Hash().String()),
+			zap.Int("txs", len(block.Transactions())), zap.String("elapsed", common.PrettyDuration(time.Since(bstart)).String()))
 
 		coalescedLogs = append(coalescedLogs, logs...)
 		//blockInsertTimer.UpdateSince(bstart)
@@ -1008,11 +996,12 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 
 		bc.gcproc += proctime
 
-		stats.processed++
-		stats.usedGas += usedGas
+		// @TODO (rgeraldes)
+		//stats.processed++
+		//stats.usedGas += usedGas
 
 		cache, _ := bc.stateCache.TrieDB().Size()
-		stats.report(chain, i, cache)
+		//stats.report(chain, i, cache)
 	}
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
@@ -1021,6 +1010,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*tr
 	return 0, events, coalescedLogs, nil
 }
 
+/*
 // insertStats tracks and reports on block insertion.
 type insertStats struct {
 	queued, processed, ignored int
@@ -1058,11 +1048,13 @@ func (st *insertStats) report(chain []*types.Block, index int, cache common.Stor
 		if st.ignored > 0 {
 			context = append(context, []interface{}{"ignored", st.ignored}...)
 		}
-		log.Info("Imported new chain segment", context...)
+		// @TODO (rgeraldes)
+		//log.Info("Imported new chain segment", context...)
 
 		*st = insertStats{startTime: now, lastIndex: index + 1}
 	}
 }
+*/
 
 func countTransactions(chain []*types.Block) (c int) {
 	for _, b := range chain {
@@ -1105,10 +1097,10 @@ func (bc *BlockChain) update() {
 
 // BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
 func (bc *BlockChain) BadBlocks() []*types.Block {
-	blocks := make([]*Block, 0, bc.badBlocks.Len())
+	blocks := make([]*types.Block, 0, bc.badBlocks.Len())
 	for _, hash := range bc.badBlocks.Keys() {
 		if blk, exist := bc.badBlocks.Peek(hash); exist {
-			block := blk.(*Block)
+			block := blk.(*types.Block)
 			blocks = append(blocks, block)
 		}
 	}
@@ -1134,15 +1126,13 @@ func (bc *BlockChain) reportBlock(block *types.Block, receipts transaction.Recei
 
 	log.Error(fmt.Sprintf(`
 ########## BAD BLOCK #########
-Chain config: %v
-
 Number: %v
 Hash: 0x%x
 %v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+`, block.Number(), block.Hash(), receiptString, err))
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
@@ -1166,12 +1156,11 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (i
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	whFunc := func(header *Header) error {
+	whFunc := func(header *types.Header) error {
 		bc.mu.Lock()
 		defer bc.mu.Unlock()
 
-		_, err := bc.hc.WriteHeader(header)
-		return err
+		return bc.hc.WriteHeader(header)
 	}
 
 	return bc.hc.InsertHeaderChain(chain, whFunc, start)
@@ -1189,7 +1178,7 @@ func (bc *BlockChain) writeHeader(header *types.Header) error {
 	bc.wg.Add(1)
 	bc.mu.Lock()
 
-	_, err := bc.hc.WriteHeader(header)
+	err := bc.hc.WriteHeader(header)
 
 	bc.mu.Unlock()
 	bc.wg.Done()
@@ -1244,9 +1233,6 @@ func (bc *BlockChain) GetAncestor(hash crypto.Hash, number, ancestor uint64, max
 func (bc *BlockChain) GetHeaderByNumber(number uint64) *types.Header {
 	return bc.hc.GetHeaderByNumber(number)
 }
-
-// Network retrieves the blockchain's chain configuration.
-func (bc *BlockChain) ChainConfig() *Config { return bc.chainCfg }
 
 // Engine retrieves the blockchain's consensus engine.
 func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }

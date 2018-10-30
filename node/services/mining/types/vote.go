@@ -26,6 +26,7 @@ import (
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/crypto/signer"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/state/accounts"
 )
@@ -164,7 +165,7 @@ func (vote *Vote) HashWithData(data ...interface{}) crypto.Hash {
 }
 
 // WithSignature returns a new vote with the given signature.
-func (vote *Vote) WithSignature(signer crypto.Signer, sig []byte) (*Vote, error) {
+func (vote *Vote) WithSignature(signer signer.Signer, sig []byte) (*Vote, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err
@@ -229,7 +230,7 @@ type addressVote struct {
 }
 
 // NewAddressVote derives the sender and includes it in the AddressVote with the vote.
-func NewAddressVote(signer crypto.Signer, vote *Vote) (*addressVote, error) {
+func NewAddressVote(signer signer.Signer, vote *Vote) (*addressVote, error) {
 	address, err := VoteSender(signer, vote)
 	if err != nil {
 		return nil, err
@@ -331,7 +332,7 @@ func (v *VotesSet) Get(h crypto.Hash) (*Vote, bool) {
 	return vote, ok
 }
 
-func VoteSender(signer crypto.Signer, vote *Vote) (accounts.Address, error) {
+func VoteSender(signer signer.Signer, vote *Vote) (accounts.Address, error) {
 	// @TODO (rgeraldes)
 	/*
 		if sc := vote.from.Load(); sc != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/crypto/signer"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 	"github.com/kowala-tech/equilibrium/state/accounts"
 )
@@ -165,7 +166,7 @@ func (tx *Transaction) ChainID() *big.Int {
 }
 
 // WithSignature returns a new transaction with the given signature.
-func (tx *Transaction) WithSignature(signer crypto.Signer, sig []byte) (*Transaction, error) {
+func (tx *Transaction) WithSignature(signer signer.Signer, sig []byte) (*Transaction, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err

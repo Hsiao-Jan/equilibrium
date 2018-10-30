@@ -20,6 +20,7 @@ import (
 
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/crypto/signer"
 	"github.com/kowala-tech/equilibrium/state/accounts"
 )
 
@@ -28,7 +29,7 @@ var _ Evidence = (*DuplicateVoting)(nil)
 // Evidence is the information that is used to decide the case.
 type Evidence interface {
 	Hash() crypto.Hash
-	FactFinder(signer crypto.Signer) (accounts.Address, error)
+	FactFinder(signer signer.Signer) (accounts.Address, error)
 }
 
 // Conviction is the verdict that results when a validator
@@ -69,6 +70,6 @@ func (dv *DuplicateVoting) Hash() crypto.Hash {
 }
 
 // FactFinder returns the validator responsible for gathering the facts.
-func (dv *DuplicateVoting) FactFinder(signer crypto.Signer) (accounts.Address, error) {
+func (dv *DuplicateVoting) FactFinder(signer signer.Signer) (accounts.Address, error) {
 	return accounts.Address{}, nil
 }

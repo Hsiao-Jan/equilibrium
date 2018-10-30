@@ -23,6 +23,7 @@ import (
 	"github.com/kowala-tech/equilibrium/common"
 	"github.com/kowala-tech/equilibrium/common/hexutil"
 	"github.com/kowala-tech/equilibrium/crypto"
+	"github.com/kowala-tech/equilibrium/crypto/signer"
 	"github.com/kowala-tech/equilibrium/encoding/rlp"
 )
 
@@ -138,7 +139,7 @@ func (prop *Proposal) HashWithData(data ...interface{}) crypto.Hash {
 }
 
 // WithSignature returns a new proposal with the given signature.
-func (prop *Proposal) WithSignature(signer crypto.Signer, sig []byte) (*Proposal, error) {
+func (prop *Proposal) WithSignature(signer signer.Signer, sig []byte) (*Proposal, error) {
 	r, s, v, err := signer.SignatureValues(sig)
 	if err != nil {
 		return nil, err

@@ -1,16 +1,19 @@
-package crypto
+package signer
 
 import (
 	"math/big"
+
+	"github.com/kowala-tech/equilibrium/crypto"
 )
 
 // Hasher represents a type capable of creating an hash.
 type Hasher interface {
-	HashWithData(data ...interface{}) Hash
+	HashWithData(data ...interface{}) crypto.Hash
 }
 
-// SignedType is a type whose integrity cannot be compromised without being detected.
-type SignedType interface {
+// @TODO (rgeraldes)
+// Sender
+type Sender interface {
 	Hasher
 	Protected() bool
 	ChainID() *big.Int
@@ -25,7 +28,7 @@ type Signer interface {
 	// given signature.
 	SignatureValues(sig []byte) (r, s, v *big.Int, err error)
 	// Hash returns the hash to be signed.
-	Hash(h Hasher) Hash
+	Hash(h Hasher) crypto.Hash
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
 }
